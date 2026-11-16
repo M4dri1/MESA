@@ -3,7 +3,7 @@
 import React, { useRef, useState } from 'react';
 import { useMesa } from '@/context/MesaContext';
 import { Room, SubjectType } from '@/types';
-import { Lock, Globe, Check, Camera, Trash2 } from 'lucide-react';
+import { Lock, Globe, Check, Camera, Trash2, Eye, EyeOff, KeyRound } from 'lucide-react';
 import { ModalShell, FIELD_LABEL, FIELD_INPUT, BTN_PRIMARY, BTN_GHOST } from '@/components/common/ModalShell';
 import { Avatar } from '@/components/common/Avatar';
 import { shrinkAvatar } from '@/lib/api';
@@ -38,6 +38,8 @@ export function CreateRoomModal() {
   const [iconError, setIconError] = useState('');
   const iconInputRef = useRef<HTMLInputElement>(null);
   const [isPrivate, setIsPrivate] = useState<boolean>(true);
+  const [isHidden, setIsHidden] = useState<boolean>(true);
+  const [password, setPassword] = useState<string>('');
   const [creating, setCreating] = useState(false);
   const [createError, setCreateError] = useState('');
 
@@ -92,6 +94,8 @@ export function CreateRoomModal() {
       subject: subject.trim() || 'Geral',
       color,
       isPrivate,
+      isHidden: isPrivate ? isHidden : false,
+      password: isPrivate && password.trim() ? password.trim() : undefined,
       iconUrl: iconUrl || undefined,
     });
     setCreating(false);
@@ -104,6 +108,8 @@ export function CreateRoomModal() {
     setSubject('');
     setIconUrl('');
     setIconError('');
+    setPassword('');
+    setIsHidden(true);
     setColor(COLOR_OPTIONS[0].value);
     // Entra direto na sala recém-criada
     setCurrentRoomId(created.id);
@@ -273,6 +279,62 @@ export function CreateRoomModal() {
               <span className="text-xs text-slate-500">Qualquer pessoa com o link</span>
             </div>
           </div>
+
+          {isPrivate && (
+            <div className="mt-3 p-3.5 rounded-2xl bg-white border border-slate-900/10 space-y-3">
+              <div>
+                <span className="block text-xs font-bold text-slate-800 mb-1.5">Visibilidade na aba principal (&ldquo;Minhas salas&rdquo;)</span>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    data-testid="room-create-visible"
+                    onClick={() => setIsHidden(false)}
+                    className={`p-2.5 rounded-xl border text-left flex items-center gap-2.5 transition-colors ${
+                      !isHidden ? 'border-[#3044f0] bg-[#3044f0]/[0.07]' : 'border-slate-900/10 hover:border-slate-900/30'
+                    }`}
+                  >
+                    <Eye className="w-4 h-4 text-[#3044f0] flex-shrink-0" />
+                    <span className="min-w-0">
+                      <span className="block text-xs font-extrabold text-slate-950">Visível com cadeado</span>
+                      <span className="block text-[11px] text-slate-500">Aparece na aba principal</span>
+                    </span>
+                  </button>
+                  <button
+                    type="button"
+                    data-testid="room-create-hidden"
+                    onClick={() => setIsHidden(true)}
+                    className={`p-2.5 rounded-xl border text-left flex items-center gap-2.5 transition-colors ${
+                      isHidden ? 'border-[#3044f0] bg-[#3044f0]/[0.07]' : 'border-slate-900/10 hover:border-slate-900/30'
+                    }`}
+                  >
+                    <EyeOff className="w-4 h-4 text-slate-600 flex-shrink-0" />
+                    <span className="min-w-0">
+                      <span className="block text-xs font-extrabold text-slate-950">Invisível (oculta)</span>
+                      <span className="block text-[11px] text-slate-500">Só aparece para quem já entrou</span>
+                    </span>
+                  </button>
+                </div>
+              </div>
+
+              <div>
+                <label htmlFor="room-create-password" className="text-xs font-bold text-slate-800 flex items-center gap-1.5 mb-1">
+                  <KeyRound className="w-3.5 h-3.5 text-[#3044f0]" />
+                  <span>Senha da sala</span>
+                  <span className="font-normal text-slate-400">(opcional)</span>
+                </label>
+                <input
+                  id="room-create-password"
+                  data-testid="room-create-password"
+                  type="password"
+                  maxLength={60}
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="Deixe vazio para entrar apenas com código/convite"
+                  className={FIELD_INPUT}
+                />
+              </div>
+            </div>
+          )}
         </div>
 
         <p className="text-xs text-slate-500 leading-relaxed">Depois de criar, você recebe um link e um código para convidar os amigos.</p>

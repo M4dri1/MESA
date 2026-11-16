@@ -15,6 +15,8 @@ export interface User {
   name: string; // Nickname / Nome aparente
   email?: string;
   avatarUrl?: string; // Foto de perfil real
+  bannerUrl?: string; // Foto de capa (banner) do perfil
+  joinSoundId?: string; // Som curto que toca quando a pessoa entra na call
   avatarLetter: string;
   avatarColor: string;
   isEmailVerified?: boolean;
@@ -116,6 +118,12 @@ export interface Room {
   color: string;
   gradient: string;
   isPrivate: boolean;
+  /** Quando privada: se true, fica oculta na aba principal para quem não é membro; se false, aparece com cadeado */
+  isHidden?: boolean;
+  /** Quando privada: indica se pede senha para entrar */
+  hasPassword?: boolean;
+  /** Se quem está olhando já faz parte da sala */
+  isMember?: boolean;
   activeCount: number;
   members: User[];
   createdAt?: string;

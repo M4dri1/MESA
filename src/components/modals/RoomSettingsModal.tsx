@@ -3,7 +3,7 @@
 import React, { useRef, useState } from 'react';
 import { useMesa } from '@/context/MesaContext';
 import { Room } from '@/types';
-import { Lock, Globe, Check, Camera, Trash2 } from 'lucide-react';
+import { Lock, Globe, Check, Camera, Trash2, Eye, EyeOff, KeyRound } from 'lucide-react';
 import { ModalShell, FIELD_LABEL, FIELD_INPUT, BTN_PRIMARY, BTN_GHOST } from '@/components/common/ModalShell';
 import { shrinkAvatar } from '@/lib/api';
 import { normalizeRoomColor } from '@/utils/roomColor';
@@ -25,6 +25,9 @@ function RoomSettingsForm({ room }: { room: Room }) {
   const [subject, setSubject] = useState(room.subject === 'Geral' ? '' : room.subject);
   const [color, setColor] = useState(/^#[0-9a-f]{6}$/i.test(room.color || '') ? room.color : COLOR_OPTIONS[0].value);
   const [isPrivate, setIsPrivate] = useState(!!room.isPrivate);
+  const [isHidden, setIsHidden] = useState(room.isHidden !== false);
+  const [password, setPassword] = useState('');
+  const [passwordChanged, setPasswordChanged] = useState(false);
   const [iconUrl, setIconUrl] = useState(room.iconUrl || '');
   const [iconChanged, setIconChanged] = useState(false);
   const [iconError, setIconError] = useState('');
@@ -72,6 +75,8 @@ function RoomSettingsForm({ room }: { room: Room }) {
       name: name.trim(),
       subject: subject.trim() || 'Geral',
       isPrivate,
+      isHidden: isPrivate ? isHidden : false,
+      ...(passwordChanged ? { password: password.trim() } : {}),
       color,
       ...(iconChanged ? { iconUrl } : {}),
     });
@@ -168,6 +173,85 @@ function RoomSettingsForm({ room }: { room: Room }) {
                   <span className="text-xs text-slate-500">Qualquer pessoa com o link</span>
                 </button>
               </div>
+
+              {isPrivate && (
+                <div className="mt-3 p-3.5 rounded-2xl bg-white border border-slate-900/10 space-y-3">
+                  <div>
+                    <span className="block text-xs font-bold text-slate-800 mb-1.5">Visibilidade na aba principal (&ldquo;Minhas salas&rdquo;)</span>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                      <button
+                        type="button"
+                        data-testid="room-settings-visible"
+                        onClick={() => setIsHidden(false)}
+                        className={`p-2.5 rounded-xl border text-left flex items-center gap-2.5 transition-colors ${
+                          !isHidden ? 'border-[#3044f0] bg-[#3044f0]/[0.07]' : 'border-slate-900/10 hover:border-slate-900/30'
+                        }`}
+                      >
+                        <Eye className="w-4 h-4 text-[#3044f0] flex-shrink-0" />
+                        <span className="min-w-0">
+                          <span className="block text-xs font-extrabold text-slate-950">Visível com cadeado</span>
+                          <span className="block text-[11px] text-slate-500">Aparece na aba principal</span>
+                        </span>
+                      </button>
+                      <button
+                        type="button"
+                        data-testid="room-settings-hidden"
+                        onClick={() => setIsHidden(true)}
+                        className={`p-2.5 rounded-xl border text-left flex items-center gap-2.5 transition-colors ${
+                          isHidden ? 'border-[#3044f0] bg-[#3044f0]/[0.07]' : 'border-slate-900/10 hover:border-slate-900/30'
+                        }`}
+                      >
+                        <EyeOff className="w-4 h-4 text-slate-600 flex-shrink-0" />
+                        <span className="min-w-0">
+                          <span className="block text-xs font-extrabold text-slate-950">Invisível (oculta)</span>
+                          <span className="block text-[11px] text-slate-500">Só aparece para quem já entrou</span>
+                        </span>
+                      </button>
+                    </div>
+                  </div>
+
+                  <div>
+                    <div className="flex items-center justify-between gap-2 mb-1">
+                      <label htmlFor="room-settings-password" className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
+                        <KeyRound className="w-3.5 h-3.5 text-[#3044f0]" />
+                        <span>Senha da sala</span>
+                        <span className="font-normal text-slate-400">
+                          {room.hasPassword && !passwordChanged ? '(ativa)' : '(opcional)'}
+                        </span>
+                      </label>
+                      {room.hasPassword && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setPassword('');
+                            setPasswordChanged(true);
+                          }}
+                          className="text-[11px] font-bold text-rose-600 hover:underline"
+                        >
+                          Remover senha
+                        </button>
+                      )}
+                    </div>
+                    <input
+                      id="room-settings-password"
+                      data-testid="room-settings-password"
+                      type="password"
+                      maxLength={60}
+                      value={password}
+                      onChange={(e) => {
+                        setPassword(e.target.value);
+                        setPasswordChanged(true);
+                      }}
+                      placeholder={
+                        room.hasPassword && !passwordChanged
+                          ? 'Digite nova senha para trocar (ou mantenha atual)'
+                          : 'Deixe vazio para entrar apenas com código/convite'
+                      }
+                      className={FIELD_INPUT}
+                    />
+                  </div>
+                </div>
+              )}
             </div>
 
             <div>

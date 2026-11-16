@@ -84,8 +84,15 @@ export function TopNavigation() {
             {showUserMenu && (
               <div
                 onMouseLeave={() => setShowUserMenu(false)}
-                className="mesa-paper absolute right-0 top-12 w-60 bg-[#f6f5f0] text-slate-900 rounded-2xl p-2 z-50 animate-fadeIn shadow-[0_24px_48px_-12px_rgba(11,15,25,0.55)]"
+                className="mesa-paper absolute right-0 top-12 w-60 bg-[#f6f5f0] text-slate-900 rounded-2xl overflow-hidden z-50 animate-fadeIn shadow-[0_24px_48px_-12px_rgba(11,15,25,0.55)]"
               >
+                {currentUser.bannerUrl && (
+                  <div
+                    className="h-14 w-full bg-cover bg-center"
+                    style={{ backgroundImage: `url(${currentUser.bannerUrl})` }}
+                  />
+                )}
+                <div className="p-2">
                 <div className="px-3 py-2.5 border-b border-slate-900/10 mb-1.5">
                   <span className="text-sm font-extrabold text-slate-950 block truncate">{currentUser.name}</span>
                   <span className="text-[11px] text-slate-500 truncate block">{currentUser.email || 'Conta Mesa'}</span>
@@ -131,6 +138,7 @@ export function TopNavigation() {
                   <LogOut className="w-4 h-4" />
                   <span>Sair da Conta</span>
                 </button>
+                </div>
               </div>
             )}
           </div>

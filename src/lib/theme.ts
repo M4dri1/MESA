@@ -15,12 +15,14 @@ export interface ThemeSettings {
   bg: string | null;
   /** Cor de destaque; null = as originais (azul e amarelo) */
   accent: string | null;
+  /** Cor exclusiva do painel de chat; null = acompanha o modo/tema */
+  chat?: string | null;
   preset: string;
   /** Claro (janelas e chat em papel creme) ou escuro (tudo escuro) */
   mode: 'light' | 'dark';
 }
 
-export const DEFAULT_THEME: ThemeSettings = { bg: null, accent: null, preset: 'padrao', mode: 'light' };
+export const DEFAULT_THEME: ThemeSettings = { bg: null, accent: null, chat: null, preset: 'padrao', mode: 'light' };
 
 export const THEME_PRESETS: { id: string; label: string; bg: string | null; accent: string | null }[] = [
   { id: 'padrao', label: 'Mesa (padrão)', bg: null, accent: null },
@@ -44,6 +46,7 @@ export function loadTheme(): ThemeSettings {
       return {
         bg: hex.test(saved.bg) ? saved.bg : null,
         accent: hex.test(saved.accent) ? saved.accent : null,
+        chat: hex.test(saved.chat) ? saved.chat : null,
         preset: typeof saved.preset === 'string' ? saved.preset : 'custom',
         mode: saved.mode === 'dark' ? 'dark' : 'light',
       };
@@ -96,6 +99,7 @@ function hslToRgb(h: number, s: number, l: number): [number, number, number] {
 interface Params {
   bg?: { hue: number; satScale: number; lightScale: number };
   accent?: { hue: number; sat: number; light: number };
+  chat?: { hex: string; hue: number; sat: number; light: number; isDark: boolean };
 }
 
 // O fundo original do Mesa (#0b0f19) serve de referência para medir os outros
@@ -117,13 +121,20 @@ function buildParams(theme: ThemeSettings): Params {
     // Nem escura demais (o texto branco some) nem clara demais (o texto escuro some)
     params.accent = { hue: h, sat: s, light: clamp(l, 0.45, 0.72) };
   }
+  if (theme.chat) {
+    const [r, g, b] = hexToRgb(theme.chat);
+    const [h, s, l] = rgbToHsl(r, g, b);
+    const lum = (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255;
+    params.chat = { hex: theme.chat, hue: h, sat: s, light: l, isDark: lum < 0.48 };
+  }
   return params;
 }
 
-function transformRgb(r: number, g: number, b: number, p: Params): [number, number, number] {
+function transformRgb(r: number, g: number, b: number, p: Params, isTextProperty = false): [number, number, number] {
   const [h, s, l] = rgbToHsl(r, g, b);
   const bluish = h >= 195 && h <= 262;
-  if (p.bg && bluish && s <= 0.55 && l <= 0.45) {
+  // Nunca escurece cor de texto (color) com a cor de fundo, senão textos escuros (slate-800/900) ficam invisíveis no modo escuro
+  if (!isTextProperty && p.bg && bluish && s <= 0.55 && l <= 0.45) {
     return hslToRgb(p.bg.hue, clamp(s * p.bg.satScale, 0, 1), clamp(l * p.bg.lightScale, 0, 0.6));
   }
   if (p.accent) {
@@ -137,21 +148,21 @@ function transformRgb(r: number, g: number, b: number, p: Params): [number, numb
   return [r, g, b];
 }
 
-const RGB_FUNCTION = /rgba?\(\s*(\d{1,3})[\s,]+(\d{1,3})[\s,]+(\d{1,3})(\s*[\/,]\s*[^)]+)?\s*\)/g;
+const RGB_FUNCTION = /rgba?\(\s*(\d{1,3})[\s,]+(\d{1,3})[\s,]+(\d{1,3})(\s*[\/,]\s*(?:var\([^)]*\)|[^)]+))?\s*\)/g;
 const HEX_COLOR = /#([0-9a-fA-F]{8}|[0-9a-fA-F]{6}|[0-9a-fA-F]{3})\b/g;
 const HAS_COLOR = /rgba?\(|#[0-9a-fA-F]{3}/;
 
-function transformValue(value: string, p: Params): string {
+function transformValue(value: string, p: Params, isTextProperty = false): string {
   return value
     .replace(RGB_FUNCTION, (match, r, g, b, alpha) => {
-      const [nr, ng, nb] = transformRgb(+r, +g, +b, p);
+      const [nr, ng, nb] = transformRgb(+r, +g, +b, p, isTextProperty);
       if (nr === +r && ng === +g && nb === +b) return match;
       return `rgb(${nr} ${ng} ${nb}${alpha ? ` / ${String(alpha).replace(/^\s*[\/,]\s*/, '')}` : ''})`;
     })
     .replace(HEX_COLOR, (match, digits: string) => {
       const full = digits.length === 3 ? digits.split('').map((c) => c + c).join('') : digits;
       const [r, g, b] = hexToRgb(`#${full}`);
-      const [nr, ng, nb] = transformRgb(r, g, b, p);
+      const [nr, ng, nb] = transformRgb(r, g, b, p, isTextProperty);
       if (nr === r && ng === g && nb === b) return match;
       const hex = [nr, ng, nb].map((n) => n.toString(16).padStart(2, '0')).join('');
       return `#${hex}${full.length === 8 ? full.slice(6) : ''}`;
@@ -167,7 +178,8 @@ function ruleToOverride(rule: CSSRule, p: Params): string | null {
       const property = styleRule.style[i];
       const value = styleRule.style.getPropertyValue(property);
       if (!HAS_COLOR.test(value)) continue;
-      const next = transformValue(value, p);
+      const isText = property === 'color' || property === 'fill' || property === 'stroke';
+      const next = transformValue(value, p, isText);
       if (next !== value) declarations.push(`${property}:${next} !important`);
     }
     return declarations.length ? `${styleRule.selectorText}{${declarations.join(';')}}` : null;
@@ -227,6 +239,31 @@ function buildOverrideCss(p: Params): string {
     css.push(`:not(button).bg-\\[\\#3044f0\\]:not(.mesa-frame){background-color:rgb(${sr} ${sg} ${sb}) !important}`);
   }
 
+  // Garante legibilidade total do texto nos cartões e no chat no modo escuro
+  css.push(
+    `html[data-mesa-mode="dark"] .mesa-paper .text-slate-950,html[data-mesa-mode="dark"] .mesa-paper .text-slate-900{color:#f8fafc !important}`,
+    `html[data-mesa-mode="dark"] .mesa-paper .text-slate-800,html[data-mesa-mode="dark"] .mesa-paper .text-slate-700{color:#e2e8f0 !important}`,
+    `html[data-mesa-mode="dark"] .mesa-paper .text-slate-600,html[data-mesa-mode="dark"] .mesa-paper .text-slate-500{color:#94a3b8 !important}`
+  );
+
+  // Cor exclusiva do painel de chat (com contraste automático de leitura para qualquer cor clara ou escura)
+  if (p.chat) {
+    const [br, bg, bb] = hslToRgb(p.chat.hue, p.chat.sat, p.chat.light);
+    const cardL = p.chat.isDark ? clamp(p.chat.light + 0.07, 0.08, 0.38) : clamp(p.chat.light + 0.06, 0.85, 0.99);
+    const [cr, cg, cb] = hslToRgb(p.chat.hue, clamp(p.chat.sat * 0.85, 0, 0.85), cardL);
+    const titleHex = p.chat.isDark ? '#f8fafc' : '#0f172a';
+    const bodyHex = p.chat.isDark ? '#e2e8f0' : '#1e293b';
+    const mutedHex = p.chat.isDark ? '#cbd5e1' : '#475569';
+    css.push(
+      `.mesa-chat-panel,html[data-mesa-mode="dark"] .mesa-chat-panel,.mesa-chat-panel .bg-\\[\\#f6f5f0\\],html[data-mesa-mode="dark"] .mesa-chat-panel .bg-\\[\\#f6f5f0\\]{background-color:rgb(${br} ${bg} ${bb}) !important;color:${bodyHex} !important}`,
+      `.mesa-chat-panel .bg-white,html[data-mesa-mode="dark"] .mesa-chat-panel .bg-white{background-color:rgb(${cr} ${cg} ${cb}) !important;color:${titleHex} !important}`,
+      `.mesa-chat-panel .text-slate-950,.mesa-chat-panel .text-slate-900,html[data-mesa-mode="dark"] .mesa-chat-panel .text-slate-950,html[data-mesa-mode="dark"] .mesa-chat-panel .text-slate-900{color:${titleHex} !important}`,
+      `.mesa-chat-panel .text-slate-800,.mesa-chat-panel .text-slate-700,html[data-mesa-mode="dark"] .mesa-chat-panel .text-slate-800,html[data-mesa-mode="dark"] .mesa-chat-panel .text-slate-700{color:${bodyHex} !important}`,
+      `.mesa-chat-panel .text-slate-600,.mesa-chat-panel .text-slate-500,html[data-mesa-mode="dark"] .mesa-chat-panel .text-slate-600,html[data-mesa-mode="dark"] .mesa-chat-panel .text-slate-500{color:${mutedHex} !important}`,
+      `.mesa-chat-panel input,.mesa-chat-panel textarea{color:${titleHex} !important}`
+    );
+  }
+
   return css.join('\n');
 }
 
@@ -249,7 +286,7 @@ export function applyTheme(theme: ThemeSettings) {
   if (theme.mode === 'dark') document.documentElement.setAttribute('data-mesa-mode', 'dark');
   else document.documentElement.removeAttribute('data-mesa-mode');
   const params = buildParams(theme);
-  if (!params.bg && !params.accent) return clearColors();
+  if (!params.bg && !params.accent && !params.chat) return clearColors();
   const css = buildOverrideCss(params);
   let style = document.getElementById(STYLE_ID) as HTMLStyleElement | null;
   if (!style) {

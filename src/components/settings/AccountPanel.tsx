@@ -1,26 +1,33 @@
 'use client';
 
 import React, { useRef, useState } from 'react';
-import { AtSign, Camera, Check, LogOut, Mail, ShieldCheck, Trash2, User } from 'lucide-react';
+import { AtSign, Camera, Check, Image as ImageIcon, LogOut, Mail, Music2, Play, ShieldCheck, Trash2, Upload, User } from 'lucide-react';
 import { useMesa } from '@/context/MesaContext';
 import { Avatar } from '@/components/common/Avatar';
+import { playClip } from '@/utils/soundpadPlayer';
+import { playJoinRoomSound } from '@/utils/soundEffects';
 
 const fieldClass =
   'w-full pl-10 pr-3.5 py-2.5 rounded-xl bg-[#f6f5f0] border border-slate-900/10 focus:border-[#3044f0] text-sm text-slate-900 placeholder-slate-400 focus:outline-none transition-colors';
 const labelClass = 'text-xs font-bold text-slate-700 block mb-1.5';
 
-/** Seção "Minha conta": foto, nome, nickname e status. É aqui que se edita o perfil. */
+/** Seção "Minha conta": foto, banner, som de entrada, nome, nickname e status. É aqui que se edita o perfil. */
 export function AccountPanel({ onLogout }: { onLogout: () => void }) {
-  const { currentUser, updateUserProfile } = useMesa();
+  const { currentUser, updateUserProfile, sounds, addSound, padVolume } = useMesa();
 
   const [fullName, setFullName] = useState(currentUser.fullName || currentUser.name || '');
   const [nickname, setNickname] = useState(currentUser.name || '');
   const [avatarUrl, setAvatarUrl] = useState<string>(currentUser.avatarUrl || '');
+  const [bannerUrl, setBannerUrl] = useState<string>(currentUser.bannerUrl || '');
+  const [joinSoundId, setJoinSoundId] = useState<string>(currentUser.joinSoundId || '');
+  const [uploadingSound, setUploadingSound] = useState(false);
   const [statusText, setStatusText] = useState(currentUser.statusText || 'Pronto para estudar');
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const bannerInputRef = useRef<HTMLInputElement>(null);
+  const soundInputRef = useRef<HTMLInputElement>(null);
 
   const handlePhotoSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -36,6 +43,44 @@ export function AccountPanel({ onLogout }: { onLogout: () => void }) {
     reader.readAsDataURL(file);
   };
 
+  const handleBannerSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (bannerInputRef.current) bannerInputRef.current.value = '';
+    if (!file) return;
+    if (!file.type.startsWith('image/')) {
+      setError('Escolha um arquivo de imagem para o banner do perfil.');
+      return;
+    }
+    setError(null);
+    const reader = new FileReader();
+    reader.onload = (event) => setBannerUrl(event.target?.result as string);
+    reader.readAsDataURL(file);
+  };
+
+  const handleSoundUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (soundInputRef.current) soundInputRef.current.value = '';
+    if (!file) return;
+    setUploadingSound(true);
+    setError(null);
+    const baseName = file.name.replace(/\.[^.]+$/, '').slice(0, 24) || 'Entrada';
+    const res = await addSound(file, { name: baseName, emoji: '🎺' });
+    setUploadingSound(false);
+    if (!res.ok) {
+      setError(res.error || 'Não foi possível enviar o áudio.');
+    }
+  };
+
+  const previewJoinSound = () => {
+    if (!joinSoundId) {
+      playJoinRoomSound();
+      return;
+    }
+    const found = sounds.find((s) => s.id === joinSoundId);
+    if (found) playClip(found.url, padVolume);
+    else playJoinRoomSound();
+  };
+
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     if (saving) return;
@@ -46,6 +91,8 @@ export function AccountPanel({ onLogout }: { onLogout: () => void }) {
       fullName: fullName.trim(),
       name: nickname.trim() || fullName.trim().split(' ')[0] || 'Estudante',
       avatarUrl,
+      bannerUrl,
+      joinSoundId,
       statusText: statusText.trim(),
     });
     setSaving(false);
@@ -67,34 +114,114 @@ export function AccountPanel({ onLogout }: { onLogout: () => void }) {
       <p className="text-xs text-slate-500 mt-1 mb-5">Seus dados no Mesa. Eles aparecem para quem estuda com você.</p>
 
       <form onSubmit={handleSave} className="space-y-4">
-        {/* Foto de perfil */}
-        <div className="p-4 rounded-xl bg-[#f6f5f0] border border-slate-900/10 flex items-center gap-4">
-          <div className="relative flex-shrink-0">
-            <Avatar letter={letter} avatarUrl={avatarUrl} color={currentUser.avatarColor || '#2563eb'} size="lg" />
-            <button
-              type="button"
-              onClick={() => fileInputRef.current?.click()}
-              title="Alterar foto de perfil"
-              className="absolute -bottom-1 -right-1 p-1.5 rounded-full bg-[#ffd027] hover:bg-[#ffdd55] text-slate-950 transition-colors"
-            >
-              <Camera className="w-3 h-3" />
-            </button>
-          </div>
-          <div className="flex-1 min-w-0">
-            <span className="text-xs font-bold text-slate-900 block">Foto de Perfil</span>
-            <span className="text-[11px] text-slate-500 block mb-1.5">Essa imagem aparecerá nas suas salas de estudo, chamadas e mensagens.</span>
-            <div className="flex items-center gap-3">
-              <button type="button" onClick={() => fileInputRef.current?.click()} className="text-xs font-bold text-[#3044f0] hover:text-[#2334c9]">
-                {avatarUrl ? 'Trocar foto' : 'Enviar foto'}
+        {/* Cartão de Perfil com Banner + Foto */}
+        <div className="rounded-2xl bg-[#f6f5f0] border border-slate-900/10 overflow-hidden">
+          <div
+            className="relative h-28 w-full flex items-end justify-end p-2.5 bg-cover bg-center"
+            style={{
+              backgroundColor: currentUser.avatarColor || '#2563eb',
+              backgroundImage: bannerUrl ? `url(${bannerUrl})` : undefined,
+            }}
+          >
+            <div className="flex items-center gap-1.5">
+              <button
+                type="button"
+                onClick={() => bannerInputRef.current?.click()}
+                className="px-2.5 py-1 rounded-full bg-black/60 hover:bg-black/80 text-white text-[11px] font-bold flex items-center gap-1.5 backdrop-blur-sm transition-colors"
+              >
+                <ImageIcon className="w-3.5 h-3.5" />
+                <span>{bannerUrl ? 'Trocar banner' : 'Adicionar banner'}</span>
               </button>
-              {avatarUrl && (
-                <button type="button" onClick={() => setAvatarUrl('')} className="text-xs font-medium text-rose-600 hover:text-rose-300 flex items-center gap-1">
-                  <Trash2 className="w-3 h-3" /> Remover foto
+              {bannerUrl && (
+                <button
+                  type="button"
+                  onClick={() => setBannerUrl('')}
+                  title="Remover banner"
+                  className="p-1.5 rounded-full bg-black/60 hover:bg-rose-600 text-white transition-colors"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
                 </button>
               )}
             </div>
+            <input ref={bannerInputRef} type="file" accept="image/*" onChange={handleBannerSelect} className="hidden" data-testid="profile-banner-input" />
           </div>
-          <input ref={fileInputRef} type="file" accept="image/*" onChange={handlePhotoSelect} className="hidden" data-testid="profile-photo-input" />
+
+          <div className="px-4 pb-4 pt-2 flex items-center gap-4">
+            <div className="relative -mt-9 flex-shrink-0 ring-4 ring-[#f6f5f0] rounded-full">
+              <Avatar letter={letter} avatarUrl={avatarUrl} color={currentUser.avatarColor || '#2563eb'} size="lg" />
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                title="Alterar foto de perfil"
+                className="absolute -bottom-1 -right-1 p-1.5 rounded-full bg-[#ffd027] hover:bg-[#ffdd55] text-slate-950 transition-colors"
+              >
+                <Camera className="w-3 h-3" />
+              </button>
+            </div>
+            <div className="flex-1 min-w-0">
+              <span className="text-xs font-bold text-slate-900 block">Foto de Perfil e Banner</span>
+              <span className="text-[11px] text-slate-500 block mb-1">Aparecem no seu cartão de perfil dentro das salas e chamadas.</span>
+              <div className="flex items-center gap-3">
+                <button type="button" onClick={() => fileInputRef.current?.click()} className="text-xs font-bold text-[#3044f0] hover:text-[#2334c9]">
+                  {avatarUrl ? 'Trocar foto' : 'Enviar foto'}
+                </button>
+                {avatarUrl && (
+                  <button type="button" onClick={() => setAvatarUrl('')} className="text-xs font-medium text-rose-600 hover:text-rose-400 flex items-center gap-1">
+                    <Trash2 className="w-3 h-3" /> Remover foto
+                  </button>
+                )}
+              </div>
+            </div>
+            <input ref={fileInputRef} type="file" accept="image/*" onChange={handlePhotoSelect} className="hidden" data-testid="profile-photo-input" />
+          </div>
+        </div>
+
+        {/* Som de entrada na call (customizável) */}
+        <div className="p-3.5 rounded-2xl bg-[#f6f5f0] border border-slate-900/10 space-y-2">
+          <div className="flex items-center justify-between gap-2">
+            <div>
+              <label htmlFor="profile-join-sound" className="text-xs font-bold text-slate-900 flex items-center gap-1.5">
+                <Music2 className="w-3.5 h-3.5 text-[#3044f0]" /> Som de entrada na call (opcional)
+              </label>
+              <span className="text-[11px] text-slate-500 block">
+                Escolha um efeito do seu Soundpad para tocar para a sala quando você entrar na chamada.
+              </span>
+            </div>
+            <button
+              type="button"
+              onClick={() => soundInputRef.current?.click()}
+              disabled={uploadingSound}
+              className="px-2.5 py-1.5 rounded-xl bg-white border border-slate-900/10 hover:border-[#3044f0] text-slate-900 text-[11px] font-bold flex items-center gap-1.5 flex-shrink-0"
+            >
+              <Upload className="w-3.5 h-3.5 text-[#3044f0]" />
+              <span>{uploadingSound ? 'Enviando...' : 'Enviar áudio'}</span>
+            </button>
+            <input ref={soundInputRef} type="file" accept="audio/*" onChange={handleSoundUpload} className="hidden" />
+          </div>
+          <div className="flex items-center gap-2">
+            <select
+              id="profile-join-sound"
+              data-testid="profile-join-sound"
+              value={joinSoundId}
+              onChange={(e) => setJoinSoundId(e.target.value)}
+              className="flex-1 min-w-0 px-3 py-2 rounded-xl bg-white border border-slate-900/10 text-xs font-semibold text-slate-900 focus:outline-none focus:border-[#3044f0]"
+            >
+              <option value="">Som padrão do Mesa (sino suave)</option>
+              {sounds.map((s) => (
+                <option key={s.id} value={s.id}>
+                  {s.emoji} {s.name}
+                </option>
+              ))}
+            </select>
+            <button
+              type="button"
+              onClick={previewJoinSound}
+              title="Ouvir prévia do som de entrada"
+              className="h-9 px-3 rounded-xl bg-[#0b0f19] hover:bg-slate-800 text-white text-xs font-bold flex items-center gap-1.5 flex-shrink-0"
+            >
+              <Play className="w-3.5 h-3.5" /> Ouvir
+            </button>
+          </div>
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">

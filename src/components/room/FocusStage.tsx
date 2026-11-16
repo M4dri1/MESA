@@ -2,7 +2,7 @@
 
 import React, { useEffect, useRef, useState } from 'react';
 import { useMesa, isActiveUntil } from '@/context/MesaContext';
-import { Mic, MicOff, Monitor, Video, X, Maximize2, Minimize2 } from 'lucide-react';
+import { Mic, MicOff, Monitor, Video, X, Maximize2, Minimize2, ZoomIn, ZoomOut } from 'lucide-react';
 import { StreamVideo } from '@/components/common/StreamVideo';
 import { RoleBadge } from '@/components/modals/ParticipantModal';
 
@@ -33,10 +33,21 @@ export function FocusStage() {
   const stageRef = useRef<HTMLDivElement>(null);
   const openedAtRef = useRef<number>(Date.now());
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const [zoom, setZoom] = useState(1);
+  const [pan, setPan] = useState({ x: 0, y: 0 });
+  const dragRef = useRef<{ active: boolean; startX: number; startY: number; origX: number; origY: number } | null>(null);
+
+  const changeZoom = (next: number) => {
+    const clamped = Math.max(1, Math.min(4, Math.round(next * 100) / 100));
+    setZoom(clamped);
+    if (clamped <= 1) setPan({ x: 0, y: 0 });
+  };
 
   useEffect(() => {
     openedAtRef.current = Date.now();
-  }, [callFocus?.id]);
+    setZoom(1);
+    setPan({ x: 0, y: 0 });
+  }, [callFocus?.id, callFocus?.kind]);
 
   useEffect(() => {
     const onFsChange = () => setIsFullscreen(!!document.fullscreenElement);
@@ -108,16 +119,44 @@ export function FocusStage() {
         if ((e.target as HTMLElement).closest('button')) return;
         toggleFullscreen();
       }}
+      onWheel={(e) => {
+        if (kind !== 'screen') return;
+        e.preventDefault();
+        changeZoom(zoom + (e.deltaY < 0 ? 0.25 : -0.25));
+      }}
+      onPointerDown={(e) => {
+        if (zoom <= 1 || (e.target as HTMLElement).closest('button')) return;
+        e.currentTarget.setPointerCapture(e.pointerId);
+        dragRef.current = { active: true, startX: e.clientX, startY: e.clientY, origX: pan.x, origY: pan.y };
+      }}
+      onPointerMove={(e) => {
+        const d = dragRef.current;
+        if (!d || !d.active) return;
+        setPan({ x: d.origX + (e.clientX - d.startX), y: d.origY + (e.clientY - d.startY) });
+      }}
+      onPointerUp={() => {
+        if (dragRef.current) dragRef.current.active = false;
+      }}
       data-testid="focus-stage"
       data-focus-id={callFocus.id}
       data-focus-kind={kind}
       className={`relative overflow-hidden flex items-center justify-center ${
         isFullscreen ? 'w-screen h-screen max-w-none rounded-none' : 'w-full max-w-5xl flex-1 min-h-[220px] rounded-2xl'
-      } ${kind === 'screen' ? 'bg-black' : 'bg-[#17203a]'} ${speaking && kind === 'camera' ? 'ring-2 ring-emerald-400' : ''}`}
+      } ${kind === 'screen' ? 'bg-black' : 'bg-[#17203a]'} ${speaking && kind === 'camera' ? 'ring-2 ring-emerald-400' : ''} ${
+        zoom > 1 ? 'cursor-grab active:cursor-grabbing' : ''
+      }`}
     >
       {kind === 'screen' ? (
         screenStream ? (
-          <StreamVideo stream={screenStream} className="w-full h-full object-contain" />
+          <div
+            style={{
+              transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`,
+              transformOrigin: 'center center',
+            }}
+            className="w-full h-full flex items-center justify-center transition-transform duration-75"
+          >
+            <StreamVideo stream={screenStream} className="w-full h-full object-contain pointer-events-none" />
+          </div>
         ) : (
           <span className="text-sm text-slate-400">Conectando à tela de {name}...</span>
         )
@@ -175,6 +214,38 @@ export function FocusStage() {
                 }`}
               >
                 <Monitor className="w-3 h-3" /> <span>Tela</span>
+              </button>
+            </div>
+          )}
+          {kind === 'screen' && (
+            <div className="flex items-center rounded-full bg-black/55 text-white p-0.5">
+              <button
+                type="button"
+                onClick={() => changeZoom(zoom - 0.25)}
+                disabled={zoom <= 1}
+                title="Diminuir zoom"
+                aria-label="Diminuir zoom"
+                className="p-1.5 rounded-full hover:bg-white/15 disabled:opacity-40"
+              >
+                <ZoomOut className="w-3.5 h-3.5" />
+              </button>
+              <button
+                type="button"
+                onClick={() => changeZoom(1)}
+                title="Voltar ao tamanho normal (100%)"
+                className="px-1.5 text-[11px] font-mono font-bold hover:text-[#ffd027]"
+              >
+                {Math.round(zoom * 100)}%
+              </button>
+              <button
+                type="button"
+                onClick={() => changeZoom(zoom + 0.25)}
+                disabled={zoom >= 4}
+                title="Aumentar zoom"
+                aria-label="Aumentar zoom"
+                className="p-1.5 rounded-full hover:bg-white/15 disabled:opacity-40"
+              >
+                <ZoomIn className="w-3.5 h-3.5" />
               </button>
             </div>
           )}

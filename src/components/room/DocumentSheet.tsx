@@ -23,6 +23,8 @@ import {
   Eye,
   Maximize2,
   Minimize2,
+  ZoomIn,
+  ZoomOut,
 } from 'lucide-react';
 
 export function DocumentSheet() {
@@ -49,6 +51,20 @@ export function DocumentSheet() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const screenViewRef = useRef<HTMLDivElement>(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const [zoom, setZoom] = useState(1);
+  const [pan, setPan] = useState({ x: 0, y: 0 });
+  const dragRef = useRef<{ active: boolean; startX: number; startY: number; origX: number; origY: number } | null>(null);
+
+  const changeZoom = (next: number) => {
+    const clamped = Math.max(1, Math.min(4, Math.round(next * 100) / 100));
+    setZoom(clamped);
+    if (clamped <= 1) setPan({ x: 0, y: 0 });
+  };
+
+  useEffect(() => {
+    setZoom(1);
+    setPan({ x: 0, y: 0 });
+  }, [watchedScreenId, screenShare?.user.id]);
 
   useEffect(() => {
     const onFsChange = () => setIsFullscreen(!!document.fullscreenElement);
@@ -259,23 +275,85 @@ export function DocumentSheet() {
                   </div>
                 )}
                 <div
-                  onDoubleClick={toggleFullscreen}
-                  className="group relative w-full flex-1 min-h-0 bg-black flex items-center justify-center"
+                  onDoubleClick={(e) => {
+                    if ((e.target as HTMLElement).closest('button')) return;
+                    toggleFullscreen();
+                  }}
+                  onWheel={(e) => {
+                    e.preventDefault();
+                    changeZoom(zoom + (e.deltaY < 0 ? 0.25 : -0.25));
+                  }}
+                  onPointerDown={(e) => {
+                    if (zoom <= 1 || (e.target as HTMLElement).closest('button')) return;
+                    e.currentTarget.setPointerCapture(e.pointerId);
+                    dragRef.current = { active: true, startX: e.clientX, startY: e.clientY, origX: pan.x, origY: pan.y };
+                  }}
+                  onPointerMove={(e) => {
+                    const d = dragRef.current;
+                    if (!d || !d.active) return;
+                    setPan({ x: d.origX + (e.clientX - d.startX), y: d.origY + (e.clientY - d.startY) });
+                  }}
+                  onPointerUp={() => {
+                    if (dragRef.current) dragRef.current.active = false;
+                  }}
+                  className={`group relative w-full flex-1 min-h-0 bg-black flex items-center justify-center overflow-hidden ${
+                    zoom > 1 ? 'cursor-grab active:cursor-grabbing' : ''
+                  }`}
                 >
                   {screenShare.stream ? (
-                    <StreamVideo stream={screenShare.stream} className="w-full h-full object-contain" />
+                    <div
+                      style={{
+                        transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`,
+                        transformOrigin: 'center center',
+                      }}
+                      className="w-full h-full flex items-center justify-center transition-transform duration-75"
+                    >
+                      <StreamVideo stream={screenShare.stream} className="w-full h-full object-contain pointer-events-none" />
+                    </div>
                   ) : (
                     <span className="text-xs text-slate-400">Conectando à tela de {screenShare.user.name}...</span>
                   )}
-                  <button
-                    type="button"
-                    onClick={toggleFullscreen}
-                    title={isFullscreen ? 'Sair da tela cheia' : 'Tela cheia'}
-                    aria-label={isFullscreen ? 'Sair da tela cheia' : 'Tela cheia'}
-                    className="absolute bottom-3 right-3 z-10 p-2 rounded-xl bg-black/65 hover:bg-black/90 text-white opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity"
-                  >
-                    {isFullscreen ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
-                  </button>
+                  <div className="absolute bottom-3 right-3 z-10 flex items-center gap-1.5 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
+                    <div className="flex items-center rounded-xl bg-black/70 text-white p-0.5 border border-white/10">
+                      <button
+                        type="button"
+                        onClick={() => changeZoom(zoom - 0.25)}
+                        disabled={zoom <= 1}
+                        title="Diminuir zoom"
+                        aria-label="Diminuir zoom"
+                        className="p-1.5 rounded-lg hover:bg-white/15 disabled:opacity-40"
+                      >
+                        <ZoomOut className="w-3.5 h-3.5" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => changeZoom(1)}
+                        title="Voltar ao tamanho normal (100%)"
+                        className="px-1.5 text-[11px] font-mono font-bold hover:text-[#ffd027]"
+                      >
+                        {Math.round(zoom * 100)}%
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => changeZoom(zoom + 0.25)}
+                        disabled={zoom >= 4}
+                        title="Aumentar zoom"
+                        aria-label="Aumentar zoom"
+                        className="p-1.5 rounded-lg hover:bg-white/15 disabled:opacity-40"
+                      >
+                        <ZoomIn className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={toggleFullscreen}
+                      title={isFullscreen ? 'Sair da tela cheia' : 'Tela cheia'}
+                      aria-label={isFullscreen ? 'Sair da tela cheia' : 'Tela cheia'}
+                      className="p-2 rounded-xl bg-black/70 hover:bg-black/90 text-white border border-white/10"
+                    >
+                      {isFullscreen ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
+                    </button>
+                  </div>
                 </div>
               </>
             ) : screenShare ? (

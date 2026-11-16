@@ -684,7 +684,7 @@ export function ChatAndMaterialsPanel() {
       }}
       onDragLeave={() => setIsDragging(false)}
       onDrop={handleDrop}
-      className={`mesa-paper w-80 md:w-[380px] lg:w-[400px] bg-[#f6f5f0] text-slate-900 flex flex-col h-full select-none relative transition-all ${
+      className={`mesa-paper mesa-chat-panel w-80 md:w-[380px] lg:w-[400px] bg-[#f6f5f0] text-slate-900 flex flex-col h-full select-none relative transition-all ${
         isDragging ? 'ring-2 ring-[#3044f0] bg-[#3044f0]/10' : ''
       }`}
     >

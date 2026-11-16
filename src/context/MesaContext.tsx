@@ -30,7 +30,7 @@ import {
   setSoundEnabled,
 } from '@/utils/soundEffects';
 import { downloadFile } from '@/utils/fileDownload';
-import { api, getStoredToken, storeToken, shrinkAvatar } from '@/lib/api';
+import { api, getStoredToken, storeToken, shrinkAvatar, shrinkBanner } from '@/lib/api';
 import { StreamAudio } from '@/components/common/StreamVideo';
 import { playClip, preloadClip } from '@/utils/soundpadPlayer';
 import { comboFromEvent } from '@/utils/hotkeys';
@@ -123,6 +123,8 @@ interface MesaContextType {
     fullName?: string;
     name: string;
     avatarUrl?: string;
+    bannerUrl?: string;
+    joinSoundId?: string;
     statusText?: string;
   }) => Promise<AuthResult>;
   isAuthModalOpen: boolean;
@@ -152,9 +154,11 @@ interface MesaContextType {
     subject: SubjectType;
     color: string;
     isPrivate: boolean;
+    isHidden?: boolean;
+    password?: string;
     iconUrl?: string;
   }) => Promise<Room | null>;
-  joinRoomByCode: (code: string) => Promise<boolean>;
+  joinRoomByCode: (code: string, password?: string) => Promise<boolean>;
   deleteRoom: (roomId: string) => void;
 
   // Call controls
@@ -350,6 +354,8 @@ export interface RoomPatch {
   name?: string;
   subject?: string;
   isPrivate?: boolean;
+  isHidden?: boolean;
+  password?: string;
   color?: string;
   /** Foto em data URL; "" tira a foto */
   iconUrl?: string;
@@ -406,6 +412,16 @@ export function MesaProvider({ children }: { children: ReactNode }) {
   const [currentRoomId, setCurrentRoomIdState] = useState<string | null>(null);
   const [enteredRoom, setEnteredRoom] = useState<Room | null>(null);
   const [participants, setParticipants] = useState<User[]>([]);
+  const [accessPrompt, setAccessPrompt] = useState<{
+    roomId?: string;
+    roomName: string;
+    code?: string;
+    needsPassword?: boolean;
+    needsCode?: boolean;
+    error?: string;
+  } | null>(null);
+  const [accessInput, setAccessInput] = useState('');
+  const [accessBusy, setAccessBusy] = useState(false);
 
   const [allMessages, setAllMessages] = useState<Record<string, ChatMessage[]>>({});
   const [olderMessages, setOlderMessages] = useState<Record<string, ChatMessage[]>>({});
@@ -1143,17 +1159,29 @@ export function MesaProvider({ children }: { children: ReactNode }) {
     setUnread({ count: 0, mentions: 0 });
   };
 
-  const enterRoom = async (roomId: string, rejoin = false): Promise<boolean> => {
+  const enterRoom = async (roomId: string, rejoin = false, access?: { password?: string; code?: string }): Promise<boolean> => {
     if (!rejoin && roomIdRef.current && roomIdRef.current !== roomId) {
       teardownPeers();
       stopLocalMedia();
     }
-    const res = await request('room:enter', { roomId });
+    const res = await request('room:enter', { roomId, ...(access || {}) });
     if (!res.ok) {
       if (rejoin) resetRoomLocally();
+      if (!rejoin && (res.needsPassword || res.needsCode)) {
+        setAccessPrompt({
+          roomId,
+          roomName: res.roomName || 'Sala privada',
+          needsPassword: !!res.needsPassword,
+          needsCode: !!res.needsCode,
+          error: access?.password || access?.code ? res.error : undefined,
+        });
+        return false;
+      }
       showNotice(res.error || 'Não foi possível entrar na sala.');
       return false;
     }
+    setAccessPrompt(null);
+    setAccessInput('');
 
     teardownPeers();
     roomIdRef.current = roomId;
@@ -1186,6 +1214,20 @@ export function MesaProvider({ children }: { children: ReactNode }) {
 
     if (!rejoin) {
       playJoinRoomSound();
+      if (res.joinSound && res.joinSound.url) {
+        const jid = userRef.current.id;
+        setSoundFlash((prev) => ({ ...prev, [jid]: { name: res.joinSound.name, emoji: res.joinSound.emoji } }));
+        window.setTimeout(() => {
+          setSoundFlash((prev) => {
+            const next = { ...prev };
+            delete next[jid];
+            return next;
+          });
+        }, 2500);
+        if (padListen && !isDeafened) {
+          void playClip(res.joinSound.url, padVolume);
+        }
+      }
       setStudyCenterMode('screen');
       if (!punishedRef.current) void startMic(true);
     }
@@ -1205,7 +1247,15 @@ export function MesaProvider({ children }: { children: ReactNode }) {
     else void enterRoom(id);
   };
 
-  const createRoom = async (data: { name: string; subject: SubjectType; color: string; isPrivate: boolean; iconUrl?: string }) => {
+  const createRoom = async (data: {
+    name: string;
+    subject: SubjectType;
+    color: string;
+    isPrivate: boolean;
+    isHidden?: boolean;
+    password?: string;
+    iconUrl?: string;
+  }) => {
     const res = await request('room:create', { ...data, gradient: gradientForColor(data.color) });
     if (!res.ok) {
       showNotice(res.error || 'Não foi possível criar a sala.');
@@ -1215,10 +1265,23 @@ export function MesaProvider({ children }: { children: ReactNode }) {
     return res.room as Room;
   };
 
-  const joinRoomByCode = async (code: string): Promise<boolean> => {
-    const res = await request('room:join', { code });
-    if (!res.ok) return false;
-    return enterRoom(res.room.id);
+  const joinRoomByCode = async (code: string, password?: string): Promise<boolean> => {
+    const res = await request('room:join', { code, ...(password ? { password } : {}) });
+    if (!res.ok) {
+      if (res.needsPassword) {
+        setAccessPrompt({
+          roomId: res.roomId,
+          roomName: res.roomName || 'Sala privada',
+          code,
+          needsPassword: true,
+          error: password ? res.error : undefined,
+        });
+      }
+      return false;
+    }
+    setAccessPrompt(null);
+    setAccessInput('');
+    return enterRoom(res.room.id, false, password ? { password } : undefined);
   };
 
   const deleteRoom = (roomId: string) => {
@@ -2238,6 +2301,8 @@ export function MesaProvider({ children }: { children: ReactNode }) {
     fullName?: string;
     name: string;
     avatarUrl?: string;
+    bannerUrl?: string;
+    joinSoundId?: string;
     statusText?: string;
   }): Promise<AuthResult> => {
     const body: Record<string, unknown> = { ...data };
@@ -2245,6 +2310,11 @@ export function MesaProvider({ children }: { children: ReactNode }) {
       body.avatarUrl =
         data.avatarUrl === currentUser.avatarUrl ? undefined : data.avatarUrl ? await shrinkAvatar(data.avatarUrl) : '';
       if (body.avatarUrl === undefined) delete body.avatarUrl;
+    }
+    if (data.bannerUrl !== undefined) {
+      body.bannerUrl =
+        data.bannerUrl === currentUser.bannerUrl ? undefined : data.bannerUrl ? await shrinkBanner(data.bannerUrl) : '';
+      if (body.bannerUrl === undefined) delete body.bannerUrl;
     }
     const res = await api('/api/profile', { body, token: tokenRef.current });
     if (!res.ok) return { success: false, error: res.error || 'Não foi possível salvar o perfil.', field: res.field };
@@ -2503,6 +2573,81 @@ export function MesaProvider({ children }: { children: ReactNode }) {
       }}
     >
       {children}
+      {accessPrompt && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#0b0f19]/75 animate-fadeIn"
+          onClick={() => {
+            setAccessPrompt(null);
+            setAccessInput('');
+          }}
+        >
+          <form
+            onClick={(e) => e.stopPropagation()}
+            onSubmit={async (e) => {
+              e.preventDefault();
+              if (!accessInput.trim() || accessBusy) return;
+              setAccessBusy(true);
+              if (accessPrompt.code && accessPrompt.needsPassword) {
+                await joinRoomByCode(accessPrompt.code, accessInput.trim());
+              } else if (accessPrompt.roomId) {
+                await enterRoom(
+                  accessPrompt.roomId,
+                  false,
+                  accessPrompt.needsPassword ? { password: accessInput.trim() } : { code: accessInput.trim() }
+                );
+              }
+              setAccessBusy(false);
+            }}
+            data-testid="room-access-modal"
+            className="mesa-paper w-full max-w-md rounded-3xl bg-[#f6f5f0] text-slate-900 p-6 shadow-2xl space-y-4"
+          >
+            <div>
+              <h3 className="landing-display text-xl text-slate-950">
+                {accessPrompt.needsPassword ? 'Senha da sala' : 'Código da sala'}
+              </h3>
+              <p className="text-xs text-slate-600 mt-1">
+                {accessPrompt.needsPassword
+                  ? `A sala "${accessPrompt.roomName}" é protegida por senha.`
+                  : `A sala "${accessPrompt.roomName}" é privada. Digite o código de convite para entrar.`}
+              </p>
+            </div>
+            <input
+              type={accessPrompt.needsPassword ? 'password' : 'text'}
+              autoFocus
+              value={accessInput}
+              onChange={(e) =>
+                setAccessInput(accessPrompt.needsPassword ? e.target.value : e.target.value.toUpperCase())
+              }
+              placeholder={accessPrompt.needsPassword ? 'Digite a senha da sala...' : 'Ex: MESA-4K7P'}
+              className="w-full px-4 py-3 rounded-xl bg-white border border-slate-900/15 focus:border-[#3044f0] text-slate-900 placeholder-slate-400 text-sm font-semibold focus:outline-none"
+            />
+            {accessPrompt.error && (
+              <p role="alert" className="text-xs font-semibold text-rose-600">
+                {accessPrompt.error}
+              </p>
+            )}
+            <div className="flex items-center justify-end gap-2 pt-1">
+              <button
+                type="button"
+                onClick={() => {
+                  setAccessPrompt(null);
+                  setAccessInput('');
+                }}
+                className="h-10 px-4 rounded-full text-xs font-bold text-slate-700 hover:bg-slate-900/10"
+              >
+                Cancelar
+              </button>
+              <button
+                type="submit"
+                disabled={accessBusy || !accessInput.trim()}
+                className="h-10 px-5 rounded-full bg-[#0b0f19] hover:bg-slate-800 disabled:opacity-50 text-white text-xs font-extrabold"
+              >
+                {accessBusy ? 'Entrando...' : 'Entrar na sala'}
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
       {/* Áudio dos outros participantes da chamada */}
       <div className="hidden" aria-hidden="true">
         {remoteAudio.map(({ key, stream, volume }) => (

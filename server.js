@@ -312,6 +312,7 @@ function publicUser(u) {
     name: u.nickname,
     fullName: u.fullName,
     avatarUrl: u.avatarUrl || '',
+    bannerUrl: u.bannerUrl || '',
     avatarLetter: (u.nickname[0] || '?').toUpperCase(),
     avatarColor: u.avatarColor,
     statusText: u.statusText || '',
@@ -321,7 +322,14 @@ function publicUser(u) {
 }
 function privateUser(u) {
   // notify: todas as mensagens, só quando me marcarem, ou nenhuma
-  return { ...publicUser(u), email: u.email, isEmailVerified: !!u.emailVerified, status: 'online', notify: u.notify || 'all' };
+  return {
+    ...publicUser(u),
+    email: u.email,
+    isEmailVerified: !!u.emailVerified,
+    status: 'online',
+    notify: u.notify || 'all',
+    joinSoundId: u.joinSoundId || '',
+  };
 }
 
 function validateNickname(nickname) {
@@ -343,6 +351,15 @@ function validateAvatar(avatarUrl) {
     return 'Foto de perfil inválida.';
   }
   if (avatarUrl.length > 400000) return 'A foto de perfil é grande demais.';
+  return null;
+}
+
+function validateBanner(bannerUrl) {
+  if (!bannerUrl) return null;
+  if (typeof bannerUrl !== 'string' || !/^data:image\/(png|jpeg|webp|gif);base64,/.test(bannerUrl)) {
+    return 'Banner inválido.';
+  }
+  if (bannerUrl.length > 500000) return 'A imagem de capa é grande demais.';
   return null;
 }
 
@@ -626,7 +643,8 @@ function generateRoomCode() {
   }
 }
 
-const canSee = (room, userId) => (!room.isPrivate || room.memberIds.includes(userId)) && !bannedUntil(room, userId);
+const canSee = (room, userId) =>
+  (!room.isPrivate || room.memberIds.includes(userId) || room.isHidden === false) && !bannedUntil(room, userId);
 const callOf = (roomId) => calls.get(roomId) || new Map();
 
 function memberDto(userId, roomId) {
@@ -646,14 +664,18 @@ function memberDto(userId, roomId) {
 
 function roomDto(room, viewerId, includeSecret = false) {
   const members = [...callOf(room.id).keys()].map((id) => memberDto(id, room.id)).filter(Boolean);
+  const isMember = room.memberIds.includes(viewerId);
   return {
     id: room.id,
     name: room.name,
     subject: room.subject,
-    code: room.code,
+    code: !room.isPrivate || isMember ? room.code : '••••',
     color: room.color,
     gradient: room.gradient,
     isPrivate: room.isPrivate,
+    isHidden: room.isPrivate ? room.isHidden !== false : false,
+    hasPassword: !!(room.isPrivate && room.password),
+    isMember,
     createdAt: room.createdAt,
     ownerId: room.ownerId,
     isOwner: room.ownerId === viewerId,
@@ -1326,6 +1348,14 @@ async function handleApi(req, res, url) {
       if (avatarError) return json(res, 400, { error: avatarError, field: 'avatar' });
       user.avatarUrl = body.avatarUrl || '';
     }
+    if (body.bannerUrl !== undefined) {
+      const bannerError = validateBanner(body.bannerUrl);
+      if (bannerError) return json(res, 400, { error: bannerError, field: 'banner' });
+      user.bannerUrl = body.bannerUrl || '';
+    }
+    if (body.joinSoundId !== undefined) {
+      user.joinSoundId = String(body.joinSoundId || '').slice(0, 60);
+    }
     save();
     const room = currentCallRoom(user.id);
     if (room) broadcastCall(room.id, { type: 'peer:joined', roomId: room.id, user: memberDto(user.id, room.id) }, user.id);
@@ -1709,6 +1739,8 @@ function handleSocketMessage(ws, msg) {
       const createIcon = String(msg.iconUrl || '');
       const createIconError = validateRoomIcon(createIcon);
       if (createIconError) return fail(createIconError);
+      const isPriv = msg.isPrivate !== false;
+      const roomPass = isPriv && msg.password ? String(msg.password).trim().slice(0, 60) : '';
       const room = {
         id: newId('room'),
         name,
@@ -1719,7 +1751,9 @@ function handleSocketMessage(ws, msg) {
         gradient: /^[a-z0-9 -]{1,120}$/.test(String(msg.gradient || ''))
           ? String(msg.gradient)
           : 'from-blue-600 via-blue-700 to-indigo-900',
-        isPrivate: msg.isPrivate !== false,
+        isPrivate: isPriv,
+        isHidden: isPriv ? msg.isHidden !== false : false,
+        password: roomPass ? sealText(roomPass) : '',
         iconUrl: createIcon,
         ownerId: user.id,
         memberIds: [user.id],
@@ -1796,8 +1830,19 @@ function handleSocketMessage(ws, msg) {
         const isPrivate = !!msg.isPrivate;
         if (isPrivate !== !!room.isPrivate) {
           room.isPrivate = isPrivate;
+          if (!isPrivate) {
+            room.isHidden = false;
+            room.password = '';
+          }
           changes.push(isPrivate ? 'deixou a sala privada (só entra com convite)' : 'deixou a sala aberta (entra quem tiver o link)');
         }
+      }
+      if (msg.isHidden !== undefined && room.isPrivate) {
+        room.isHidden = !!msg.isHidden;
+      }
+      if (msg.password !== undefined && room.isPrivate) {
+        const nextPass = String(msg.password || '').trim().slice(0, 60);
+        room.password = nextPass ? sealText(nextPass) : '';
       }
       if (msg.color !== undefined) {
         const color = String(msg.color);
@@ -1826,6 +1871,18 @@ function handleSocketMessage(ws, msg) {
       if (!room) return fail('Código não encontrado. Confira com quem criou a sala.');
       if (bannedUntil(room, user.id)) return fail(`Você foi expulso dessa sala ${untilText(bannedUntil(room, user.id))}.`);
       if (!room.memberIds.includes(user.id)) {
+        if (room.isPrivate && room.password) {
+          const plainPass = openText(room.password);
+          if (String(msg.password || '').trim() !== plainPass) {
+            return reply({
+              ok: false,
+              needsPassword: true,
+              roomId: room.id,
+              roomName: room.name,
+              error: msg.password ? 'Senha incorreta.' : 'Esta sala privada pede uma senha para entrar.',
+            });
+          }
+        }
         room.memberIds.push(user.id);
         save();
       }
@@ -1839,7 +1896,28 @@ function handleSocketMessage(ws, msg) {
       if (!room) return fail('Essa sala não existe mais.');
       if (bannedUntil(room, user.id)) return fail(`Você foi expulso dessa sala ${untilText(bannedUntil(room, user.id))}.`);
       if (!room.memberIds.includes(user.id)) {
-        if (room.isPrivate) return fail('Sala privada: entre usando o código de convite.');
+        if (room.isPrivate) {
+          if (room.password) {
+            const plainPass = openText(room.password);
+            if (!msg.password || String(msg.password).trim() !== plainPass) {
+              return reply({
+                ok: false,
+                needsPassword: true,
+                roomId: room.id,
+                roomName: room.name,
+                error: msg.password ? 'Senha incorreta.' : 'Sala privada: digite a senha da sala para entrar.',
+              });
+            }
+          } else if (!msg.code || normalizeCode(msg.code) !== normalizeCode(room.code)) {
+            return reply({
+              ok: false,
+              needsCode: true,
+              roomId: room.id,
+              roomName: room.name,
+              error: 'Sala privada: entre usando o código de convite.',
+            });
+          }
+        }
         room.memberIds.push(user.id);
         save();
       }
@@ -1865,6 +1943,14 @@ function handleSocketMessage(ws, msg) {
         .map((id) => memberDto(id, room.id))
         .filter(Boolean);
 
+      let joinSound = null;
+      if (!already && user.joinSoundId && !punishedUntil(room, user.id)) {
+        const s = (db.sounds[user.id] || []).find((item) => item.id === user.joinSoundId);
+        if (s && db.files[s.id]) {
+          joinSound = { userId: user.id, name: s.name, emoji: s.emoji || '🔊', url: soundUrl(s.id) };
+        }
+      }
+
       reply({
         ok: true,
         room: roomDto(room, user.id, true),
@@ -1875,8 +1961,12 @@ function handleSocketMessage(ws, msg) {
         board: db.boards[room.id] || [],
         music: musicDto(room.id),
         pomodoro: pomodoroDto(room.id),
+        ...(joinSound ? { joinSound } : {}),
       });
       broadcastCall(room.id, { type: 'peer:joined', roomId: room.id, user: memberDto(user.id, room.id) }, user.id);
+      if (joinSound) {
+        broadcastCall(room.id, { type: 'sound:play', roomId: room.id, ...joinSound }, user.id);
+      }
       pushStateAll();
       return;
     }

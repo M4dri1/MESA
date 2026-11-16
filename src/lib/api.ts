@@ -71,3 +71,35 @@ export function shrinkAvatar(dataUrl: string, size = 160): Promise<string> {
     img.src = dataUrl;
   });
 }
+
+/** Reduz a imagem de capa (banner) para proporção panorâmica leve antes de enviar ao servidor. */
+export function shrinkBanner(dataUrl: string, width = 640, height = 220): Promise<string> {
+  return new Promise((resolve) => {
+    if (!dataUrl || !dataUrl.startsWith('data:image/')) return resolve('');
+    const img = new Image();
+    img.onload = () => {
+      const canvas = document.createElement('canvas');
+      canvas.width = width;
+      canvas.height = height;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) return resolve('');
+      const targetRatio = width / height;
+      const imgRatio = img.width / img.height;
+      let sw = img.width;
+      let sh = img.height;
+      let sx = 0;
+      let sy = 0;
+      if (imgRatio > targetRatio) {
+        sw = img.height * targetRatio;
+        sx = (img.width - sw) / 2;
+      } else {
+        sh = img.width / targetRatio;
+        sy = (img.height - sh) / 2;
+      }
+      ctx.drawImage(img, sx, sy, sw, sh, 0, 0, width, height);
+      resolve(canvas.toDataURL('image/jpeg', 0.82));
+    };
+    img.onerror = () => resolve('');
+    img.src = dataUrl;
+  });
+}

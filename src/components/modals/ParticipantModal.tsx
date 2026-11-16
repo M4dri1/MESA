@@ -322,8 +322,14 @@ export function ParticipantModal() {
         visibility: place ? 'visible' : 'hidden',
       }}
     >
-      {/* Faixa colorida + avatar, como um cartão de perfil */}
-      <div className="h-14 relative" style={{ backgroundColor: member.avatarColor || '#2563eb' }}>
+      {/* Faixa colorida / banner + avatar, como um cartão de perfil */}
+      <div
+        className="h-20 relative bg-cover bg-center"
+        style={{
+          backgroundColor: member.avatarColor || '#2563eb',
+          backgroundImage: member.bannerUrl ? `url(${member.bannerUrl})` : undefined,
+        }}
+      >
         <button
           onClick={close}
           title="Fechar"
