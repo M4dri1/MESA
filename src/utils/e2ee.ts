@@ -154,12 +154,26 @@ function fromBase64(b64: string): Uint8Array | null {
   }
 }
 
+const keyCache = new Map<string, { encKey: Uint8Array; macKey: Uint8Array }>();
+
 function deriveKeys(roomId: string, secret: string): { encKey: Uint8Array; macKey: Uint8Array } {
+  const cacheKey = `${roomId}:${secret}`;
+  const cached = keyCache.get(cacheKey);
+  if (cached) return cached;
+
   const enc = new TextEncoder();
-  const master = hmacSha256(enc.encode(`mesa:e2ee:v1:${roomId}`), enc.encode(secret));
-  const encKey = hmacSha256(master, enc.encode('encryption-subkey'));
-  const macKey = hmacSha256(master, enc.encode('authentication-subkey'));
-  return { encKey, macKey };
+  const salt = enc.encode(`mesa:e2ee:v1:salt:${roomId}`);
+  let master = hmacSha256(salt, enc.encode(secret));
+  for (let i = 0; i < 1024; i++) {
+    master = hmacSha256(master, salt);
+  }
+  const derived = {
+    encKey: hmacSha256(master, enc.encode('encryption-subkey')),
+    macKey: hmacSha256(master, enc.encode('authentication-subkey')),
+  };
+  if (keyCache.size > 64) keyCache.delete(keyCache.keys().next().value!);
+  keyCache.set(cacheKey, derived);
+  return derived;
 }
 
 function xorStream(data: Uint8Array, encKey: Uint8Array, nonce: Uint8Array): Uint8Array {

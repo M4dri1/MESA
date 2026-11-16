@@ -106,6 +106,49 @@ function openText(sealed) {
   }
 }
 
+const { Transform } = require('stream');
+
+function fileKey(fileId) {
+  return crypto.createHmac('sha256', MASTER_KEY).update(`file:${fileId}`).digest();
+}
+
+function addCounter128(ivBuf, blocks) {
+  const out = Buffer.from(ivBuf);
+  let carry = BigInt(blocks);
+  for (let i = 15; i >= 0 && carry > 0n; i--) {
+    const sum = BigInt(out[i]) + (carry & 0xffn);
+    out[i] = Number(sum & 0xffn);
+    carry = (carry >> 8n) + (sum >> 8n);
+  }
+  return out;
+}
+
+function streamFileRange(file, filePath, start, end, res) {
+  if (!file.iv) {
+    fs.createReadStream(filePath, { start, end }).pipe(res);
+    return;
+  }
+  const blockIndex = Math.floor(start / 16);
+  let skip = start % 16;
+  const alignedStart = blockIndex * 16;
+  const counterIv = addCounter128(Buffer.from(file.iv, 'hex'), blockIndex);
+  const decipher = crypto.createDecipheriv('aes-256-ctr', fileKey(file.id), counterIv);
+  const slicer = new Transform({
+    transform(chunk, _enc, cb) {
+      if (skip > 0) {
+        if (chunk.length <= skip) {
+          skip -= chunk.length;
+          return cb();
+        }
+        chunk = chunk.subarray(skip);
+        skip = 0;
+      }
+      cb(null, chunk);
+    },
+  });
+  fs.createReadStream(filePath, { start: alignedStart, end }).pipe(decipher).pipe(slicer).pipe(res);
+}
+
 function decryptDbInPlace(target) {
   for (const room of target.rooms || []) {
     room.e2eKey = openText(room.e2eKey) || crypto.randomBytes(32).toString('hex');
@@ -137,23 +180,40 @@ function serializeEncryptedDb(source) {
   for (const [roomId, note] of Object.entries(source.notes || {})) {
     sealedNotes[roomId] = sealText(String(note || ''));
   }
-  return JSON.stringify({
+  const payload = JSON.stringify({
     ...source,
     rooms: sealedRooms,
     messages: sealedMessages,
     notes: sealedNotes,
   });
+  return JSON.stringify({ _sealed: sealText(payload) });
 }
 
 let db = { users: [], sessions: {}, rooms: [], messages: {}, materials: {}, notes: {}, files: {}, boards: {}, pomodoro: {}, stickers: {}, sounds: {} };
 try {
   if (fs.existsSync(DB_FILE)) {
-    db = Object.assign(db, JSON.parse(fs.readFileSync(DB_FILE, 'utf8')));
+    const parsed = JSON.parse(fs.readFileSync(DB_FILE, 'utf8'));
+    const unpacked = parsed && typeof parsed._sealed === 'string' ? JSON.parse(openText(parsed._sealed)) : parsed;
+    db = Object.assign(db, unpacked);
     decryptDbInPlace(db);
   }
 } catch (err) {
   console.error('Não foi possível ler data/db.json:', err.message);
   process.exit(1);
+}
+
+// Cifra no disco arquivos antigos que ainda estavam sem IV em data/uploads/
+for (const file of Object.values(db.files || {})) {
+  if (!file || file.iv) continue;
+  const fp = path.join(UPLOAD_DIR, file.id);
+  if (!fs.existsSync(fp)) continue;
+  try {
+    const plain = fs.readFileSync(fp);
+    const iv = crypto.randomBytes(16);
+    const cipher = crypto.createCipheriv('aes-256-ctr', fileKey(file.id), iv);
+    fs.writeFileSync(fp, Buffer.concat([cipher.update(plain), cipher.final()]));
+    file.iv = iv.toString('hex');
+  } catch {}
 }
 
 // Salas criadas antes da moderação e E2EE existirem ganham os campos novos
@@ -1286,6 +1346,8 @@ async function handleApi(req, res, url) {
     if (refused) return json(res, refused.status, { error: refused.error });
 
     const fileId = crypto.randomBytes(16).toString('hex');
+    const fileIv = crypto.randomBytes(16);
+    const fileCipher = crypto.createCipheriv('aes-256-ctr', fileKey(fileId), fileIv);
     const filePath = path.join(UPLOAD_DIR, fileId);
     const out = fs.createWriteStream(filePath);
     let size = 0;
@@ -1294,6 +1356,7 @@ async function handleApi(req, res, url) {
     const fail = (status, error) => {
       if (failed) return;
       failed = true;
+      fileCipher.destroy();
       out.destroy();
       fs.rm(filePath, { force: true }, () => {});
       if (!res.headersSent) json(res, status, { error });
@@ -1316,7 +1379,7 @@ async function handleApi(req, res, url) {
       // .webm pode ser áudio ou vídeo: vale o tipo que o navegador declarou, se for um vídeo conhecido
       const declared = String(req.headers['content-type'] || '').split(';')[0].trim().toLowerCase();
       const mime = VIDEO_TYPES.has(declared) ? declared : EXT_TYPES[ext] || 'application/octet-stream';
-      db.files[fileId] = { id: fileId, name, mime, size, roomId: room.id, uploaderId: user.id };
+      db.files[fileId] = { id: fileId, name, mime, size, roomId: room.id, uploaderId: user.id, iv: fileIv.toString('hex') };
       const dayRecord = uploadDays.get(user.id);
       uploadDays.set(user.id, { day: today(), bytes: (dayRecord && dayRecord.day === today() ? dayRecord.bytes : 0) + size });
       const url = `/api/files/${fileId}/${encodeURIComponent(name)}`;
@@ -1378,7 +1441,7 @@ async function handleApi(req, res, url) {
       const material = addMaterial(room.id, user, { title: name, type, size: formatSize(size), url, fileId, asDocument: true });
       json(res, 201, { material });
     });
-    req.pipe(out);
+    req.pipe(fileCipher).pipe(out);
     return;
   }
 
@@ -1418,12 +1481,12 @@ async function handleApi(req, res, url) {
         return res.end();
       }
       res.writeHead(206, { ...headers, 'Content-Range': `bytes ${start}-${end}/${file.size}`, 'Content-Length': end - start + 1 });
-      fs.createReadStream(filePath, { start, end }).pipe(res);
+      streamFileRange(file, filePath, start, end, res);
       return;
     }
 
     res.writeHead(200, { ...headers, 'Content-Length': file.size });
-    fs.createReadStream(filePath).pipe(res);
+    streamFileRange(file, filePath, 0, file.size - 1, res);
     return;
   }
 
@@ -1461,8 +1524,10 @@ async function handleApi(req, res, url) {
         rawEmoji = decodeURIComponent(String(req.headers['x-emoji'] || ''));
       } catch {}
       const fileId = crypto.randomBytes(16).toString('hex');
-      fs.writeFileSync(path.join(UPLOAD_DIR, fileId), body);
-      db.files[fileId] = { id: fileId, name: `som.${SOUND_EXTENSIONS[mime]}`, mime, size: body.length, roomId: null, uploaderId: user.id, sound: true };
+      const soundIv = crypto.randomBytes(16);
+      const soundCipher = crypto.createCipheriv('aes-256-ctr', fileKey(fileId), soundIv);
+      fs.writeFileSync(path.join(UPLOAD_DIR, fileId), Buffer.concat([soundCipher.update(body), soundCipher.final()]));
+      db.files[fileId] = { id: fileId, name: `som.${SOUND_EXTENSIONS[mime]}`, mime, size: body.length, roomId: null, uploaderId: user.id, sound: true, iv: soundIv.toString('hex') };
       mine.push({ id: fileId, name: cleanSoundName(rawName) || 'Som', emoji: cleanEmoji(rawEmoji) || '🔊', key: '' });
       save();
       return json(res, 201, { sounds: soundsOf(user.id) });
@@ -1512,9 +1577,11 @@ async function handleApi(req, res, url) {
       const body = await readBody(req, MAX_STICKER_BYTES);
       if (!body.length) return json(res, 400, { error: 'Imagem vazia.' });
       const fileId = crypto.randomBytes(16).toString('hex');
-      fs.writeFileSync(path.join(UPLOAD_DIR, fileId), body);
+      const stickerIv = crypto.randomBytes(16);
+      const stickerCipher = crypto.createCipheriv('aes-256-ctr', fileKey(fileId), stickerIv);
+      fs.writeFileSync(path.join(UPLOAD_DIR, fileId), Buffer.concat([stickerCipher.update(body), stickerCipher.final()]));
       const mime = Object.keys(STICKER_TYPES).find((type) => STICKER_TYPES[type] === ext);
-      db.files[fileId] = { id: fileId, name: `figurinha.${ext}`, mime, size: body.length, roomId: null, uploaderId: user.id, sticker: true };
+      db.files[fileId] = { id: fileId, name: `figurinha.${ext}`, mime, size: body.length, roomId: null, uploaderId: user.id, sticker: true, iv: stickerIv.toString('hex') };
       mine.unshift(fileId);
       save();
       return json(res, 201, { stickers: stickersOf(user.id) });
