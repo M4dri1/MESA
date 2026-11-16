@@ -1063,7 +1063,10 @@ try {
 let klipyKey = process.env.KLIPY_KEY || '';
 try {
   const klipyPath = path.join(__dirname, 'klipy.config.json');
-  if (!klipyKey && fs.existsSync(klipyPath)) klipyKey = String(JSON.parse(fs.readFileSync(klipyPath, 'utf8')).key || '').trim();
+  if (!klipyKey && fs.existsSync(klipyPath)) {
+    const parsed = JSON.parse(fs.readFileSync(klipyPath, 'utf8'));
+    klipyKey = String(parsed.key || parsed.apiKey || '').trim();
+  }
 } catch (err) {
   console.error('klipy.config.json inválido:', err.message);
 }
