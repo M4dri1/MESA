@@ -4,24 +4,26 @@ import React, { useEffect, useState } from 'react';
 import { THEME_PRESETS, ThemeSettings, applyTheme, effectiveAccent, effectiveBg, loadTheme, saveTheme, DEFAULT_THEME } from '@/lib/theme';
 import { Palette, RotateCcw, Check, Sun, Moon } from 'lucide-react';
 import { ColorField } from '@/components/common/ColorField';
+import { useMesa } from '@/context/MesaContext';
 
 const FALLBACK_BG = '#0b0f19';
 const FALLBACK_ACCENT = '#ffd027';
 
 /**
  * Seção "Aparência" das Configurações: cores do Mesa. Tudo vale só no seu navegador:
- * ninguém mais vê, e a escolha fica guardada neste aparelho.
+ * ninguém mais vê, e a escolha fica guardada por conta neste aparelho.
  */
 export function AppearancePanel() {
+  const { currentUser } = useMesa();
   const [theme, setTheme] = useState<ThemeSettings>(DEFAULT_THEME);
 
   useEffect(() => {
-    setTheme(loadTheme());
-  }, []);
+    setTheme(loadTheme(currentUser?.id));
+  }, [currentUser?.id]);
 
   const update = (next: ThemeSettings) => {
     setTheme(next);
-    saveTheme(next);
+    saveTheme(next, currentUser?.id);
     applyTheme(next);
   };
 

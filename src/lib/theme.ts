@@ -38,9 +38,12 @@ export const THEME_PRESETS: { id: string; label: string; bg: string | null; acce
 const STORAGE_KEY = 'mesa_theme';
 const STYLE_ID = 'mesa-theme';
 
-export function loadTheme(): ThemeSettings {
+const themeKeyFor = (userId?: string | null) =>
+  userId && userId !== 'guest' ? `${STORAGE_KEY}:${userId}` : STORAGE_KEY;
+
+export function loadTheme(userId?: string | null): ThemeSettings {
   try {
-    const saved = JSON.parse(localStorage.getItem(STORAGE_KEY) || 'null');
+    const saved = JSON.parse(localStorage.getItem(themeKeyFor(userId)) || 'null');
     if (saved && typeof saved === 'object') {
       const hex = /^#[0-9a-fA-F]{6}$/;
       return {
@@ -55,9 +58,12 @@ export function loadTheme(): ThemeSettings {
   return { ...DEFAULT_THEME };
 }
 
-export function saveTheme(theme: ThemeSettings) {
+export function saveTheme(theme: ThemeSettings, userId?: string | null) {
   try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(theme));
+    const raw = JSON.stringify(theme);
+    localStorage.setItem(themeKeyFor(userId), raw);
+    // Espelho da sessão atual para evitar piscar claro/escuro ao recarregar a página
+    localStorage.setItem(STORAGE_KEY, raw);
   } catch {}
 }
 
@@ -262,6 +268,9 @@ export function clearTheme() {
   document.getElementById(STYLE_ID)?.remove();
   document.documentElement.removeAttribute('data-mesa-theme');
   document.documentElement.removeAttribute('data-mesa-mode');
+  try {
+    localStorage.removeItem(STORAGE_KEY);
+  } catch {}
 }
 
 /** Só tira as cores recalculadas (o modo claro/escuro é outra coisa e fica) */

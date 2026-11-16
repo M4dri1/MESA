@@ -17,13 +17,14 @@ import { ParticipantModal } from '@/components/modals/ParticipantModal';
 import { SettingsModal } from '@/components/modals/SettingsModal';
 import { initPrefs } from '@/lib/preferences';
 import { startI18n } from '@/lib/i18n';
-import { applyTheme, clearTheme, loadTheme } from '@/lib/theme';
+import { applyTheme, clearTheme, loadTheme, saveTheme } from '@/lib/theme';
 import { AuthModal } from '@/components/auth/AuthModal';
 import { AlertCircle, X } from 'lucide-react';
 
 export function MainApp() {
   const {
     currentRoom,
+    currentUser,
     mediaNotice,
     clearMediaNotice,
     isAuthenticated,
@@ -63,11 +64,16 @@ export function MainApp() {
     return startI18n();
   }, []);
 
-  // O tema (cores) vale só dentro do app, para quem está logado
+  // O tema (cores) vale só dentro do app, separado por conta
   useEffect(() => {
-    if (isAuthenticated) applyTheme(loadTheme());
-    else clearTheme();
-  }, [isAuthenticated]);
+    if (isAuthenticated && currentUser?.id) {
+      const userTheme = loadTheme(currentUser.id);
+      saveTheme(userTheme, currentUser.id);
+      applyTheme(userTheme);
+    } else {
+      clearTheme();
+    }
+  }, [isAuthenticated, currentUser?.id]);
 
   // Enquanto confere a sessão salva, não mostra nem a landing nem o app
   if (isAuthLoading) {
