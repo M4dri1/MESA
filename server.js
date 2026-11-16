@@ -338,24 +338,32 @@ function validateNickname(nickname) {
   if (!/^[\p{L}\p{N}_.-]+$/u.test(value)) return 'Use só letras, números, ponto, hífen ou _ no nickname (sem espaços).';
   return null;
 }
-// Foto da sala: imagem pequena (o navegador reduz antes de mandar)
+function isAllowedMediaUrl(url) {
+  if (typeof url !== 'string' || url.length > 500) return false;
+  return /^https:\/\/([a-z0-9-]+\.)*(giphy\.com|tenor\.com|klipy\.co|imgur\.com)\/[^\s"'<>]+$/i.test(url);
+}
+
+// Foto da sala: imagem pequena (o navegador reduz antes de mandar) ou GIF da busca
 function validateRoomIcon(icon) {
   if (!icon) return '';
-  if (!/^data:image\/(png|jpeg|webp);base64,[A-Za-z0-9+/=]+$/.test(icon) || icon.length > 180000) return 'Imagem inválida ou grande demais.';
+  if (isAllowedMediaUrl(icon)) return '';
+  if (!/^data:image\/(png|jpeg|webp|gif);base64,[A-Za-z0-9+/=]+$/.test(icon) || icon.length > 450000) return 'Imagem inválida ou grande demais.';
   return '';
 }
 
 function validateAvatar(avatarUrl) {
   if (!avatarUrl) return null;
+  if (isAllowedMediaUrl(avatarUrl)) return null;
   if (typeof avatarUrl !== 'string' || !/^data:image\/(png|jpeg|webp|gif);base64,/.test(avatarUrl)) {
     return 'Foto de perfil inválida.';
   }
-  if (avatarUrl.length > 400000) return 'A foto de perfil é grande demais.';
+  if (avatarUrl.length > 450000) return 'A foto de perfil é grande demais.';
   return null;
 }
 
 function validateBanner(bannerUrl) {
   if (!bannerUrl) return null;
+  if (isAllowedMediaUrl(bannerUrl)) return null;
   if (typeof bannerUrl !== 'string' || !/^data:image\/(png|jpeg|webp|gif);base64,/.test(bannerUrl)) {
     return 'Banner inválido.';
   }

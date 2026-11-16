@@ -28,7 +28,13 @@ export function RoomCard({ room, onEnter }: RoomCardProps) {
   };
 
   return (
-    <div className="mesa-paper group relative flex flex-col rounded-3xl bg-[#f6f5f0] text-slate-950 p-2 hover:-translate-y-1 hover:shadow-[0_24px_40px_-16px_rgba(11,15,25,0.55)] transition-all duration-150">
+    <div
+      onDoubleClick={(e) => {
+        if (!(e.target as HTMLElement).closest('button')) onEnter(room);
+      }}
+      title="Clique duas vezes para abrir a sala"
+      className="mesa-paper group relative flex flex-col rounded-3xl bg-[#f6f5f0] text-slate-950 p-2 cursor-pointer hover:-translate-y-1 hover:shadow-[0_24px_40px_-16px_rgba(11,15,25,0.55)] transition-all duration-150"
+    >
       {/* O cartaz */}
       <div
         data-testid="room-card-poster"
@@ -98,7 +104,7 @@ export function RoomCard({ room, onEnter }: RoomCardProps) {
             {isOnline && room.members.length > 0 && (
               <div className="flex items-center -space-x-1.5">
                 {room.members.slice(0, 4).map((member, idx) => (
-                  <div key={member.id || idx} className="ring-2 ring-[#f6f5f0] rounded-full" title={member.name}>
+                  <div key={member.id || idx} className="inline-flex ring-2 ring-[#f6f5f0] rounded-full" title={member.name}>
                     <Avatar letter={member.avatarLetter} avatarUrl={member.avatarUrl} color={member.avatarColor} size="sm" />
                   </div>
                 ))}

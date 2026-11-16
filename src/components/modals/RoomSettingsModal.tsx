@@ -8,6 +8,7 @@ import { ModalShell, FIELD_LABEL, FIELD_INPUT, BTN_PRIMARY, BTN_GHOST } from '@/
 import { shrinkAvatar } from '@/lib/api';
 import { normalizeRoomColor } from '@/utils/roomColor';
 import { COLOR_OPTIONS } from './CreateRoomModal';
+import { ImagePickerModal } from '@/components/common/ImagePickerModal';
 
 /** Configurações de uma sala que já existe: nome, matéria, quem pode entrar, cor e foto (dono e adm) */
 export function RoomSettingsModal() {
@@ -31,6 +32,7 @@ function RoomSettingsForm({ room }: { room: Room }) {
   const [iconUrl, setIconUrl] = useState(room.iconUrl || '');
   const [iconChanged, setIconChanged] = useState(false);
   const [iconError, setIconError] = useState('');
+  const [showIconPicker, setShowIconPicker] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const iconInputRef = useRef<HTMLInputElement>(null);
@@ -301,8 +303,8 @@ function RoomSettingsForm({ room }: { room: Room }) {
               <div className="flex items-center gap-4">
                 <button
                   type="button"
-                  onClick={() => iconInputRef.current?.click()}
-                  title="Escolher foto"
+                  onClick={() => setShowIconPicker(true)}
+                  title="Escolher foto ou GIF"
                   className="relative w-16 h-16 rounded-2xl overflow-hidden border-2 border-dashed border-slate-900/25 bg-white hover:border-[#3044f0] flex items-center justify-center text-slate-400 hover:text-[#3044f0] transition-colors flex-shrink-0"
                 >
                   {iconUrl ? (
@@ -313,8 +315,8 @@ function RoomSettingsForm({ room }: { room: Room }) {
                   )}
                 </button>
                 <div className="flex items-center gap-4">
-                  <button type="button" onClick={() => iconInputRef.current?.click()} className="text-sm font-bold text-[#3044f0] hover:text-[#2334c9] underline underline-offset-4">
-                    Escolher foto
+                  <button type="button" onClick={() => setShowIconPicker(true)} className="text-sm font-bold text-[#3044f0] hover:text-[#2334c9] underline underline-offset-4">
+                    Escolher foto ou GIF
                   </button>
                   {iconUrl && (
                     <button
@@ -333,6 +335,18 @@ function RoomSettingsForm({ room }: { room: Room }) {
                 <input ref={iconInputRef} type="file" accept="image/*" onChange={handleIconFile} className="hidden" data-testid="room-settings-icon-input" />
               </div>
               {iconError && <p role="alert" className="text-xs text-rose-600 font-semibold mt-2">{iconError}</p>}
+              <ImagePickerModal
+                open={showIconPicker}
+                shape="room"
+                title="Foto ou GIF da sala"
+                initialUrl={iconUrl}
+                onClose={() => setShowIconPicker(false)}
+                onSelect={(url) => {
+                  setIconError('');
+                  setIconUrl(url);
+                  setIconChanged(true);
+                }}
+              />
             </div>
 
             {error && (

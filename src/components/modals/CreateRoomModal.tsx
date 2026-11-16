@@ -9,6 +9,7 @@ import { Avatar } from '@/components/common/Avatar';
 import { shrinkAvatar } from '@/lib/api';
 import { normalizeRoomColor } from '@/utils/roomColor';
 import { RoomCard } from '@/components/rooms/RoomCard';
+import { ImagePickerModal } from '@/components/common/ImagePickerModal';
 
 const SUBJECT_OPTIONS: SubjectType[] = [
   'Matemática',
@@ -36,6 +37,7 @@ export function CreateRoomModal() {
   const [color, setColor] = useState(COLOR_OPTIONS[0].value);
   const [iconUrl, setIconUrl] = useState('');
   const [iconError, setIconError] = useState('');
+  const [showIconPicker, setShowIconPicker] = useState(false);
   const iconInputRef = useRef<HTMLInputElement>(null);
   const [isPrivate, setIsPrivate] = useState<boolean>(true);
   const [isHidden, setIsHidden] = useState<boolean>(false);
@@ -213,8 +215,8 @@ export function CreateRoomModal() {
             <button
               type="button"
               data-testid="room-create-icon-button"
-              onClick={() => iconInputRef.current?.click()}
-              title="Escolher foto"
+              onClick={() => setShowIconPicker(true)}
+              title="Escolher foto ou GIF"
               className="relative w-16 h-16 rounded-2xl overflow-hidden border-2 border-dashed border-slate-900/25 bg-white hover:border-[#3044f0] flex items-center justify-center text-slate-400 hover:text-[#3044f0] transition-colors flex-shrink-0"
             >
               {iconUrl ? (
@@ -226,8 +228,8 @@ export function CreateRoomModal() {
             </button>
             <div className="min-w-0">
               <div className="flex items-center gap-4">
-                <button type="button" onClick={() => iconInputRef.current?.click()} className="text-sm font-bold text-[#3044f0] hover:text-[#2334c9] underline underline-offset-4">
-                  Escolher foto
+                <button type="button" onClick={() => setShowIconPicker(true)} className="text-sm font-bold text-[#3044f0] hover:text-[#2334c9] underline underline-offset-4">
+                  Escolher foto ou GIF
                 </button>
                 {iconUrl && (
                   <button
@@ -240,11 +242,22 @@ export function CreateRoomModal() {
                   </button>
                 )}
               </div>
-              <p className="text-xs text-slate-500 mt-1">Aparece no cartão da sala e na barra da esquerda.</p>
+              <p className="text-xs text-slate-500 mt-1">Posicione uma foto ou pesquise um GIF animado para a capa da sala.</p>
             </div>
             <input ref={iconInputRef} type="file" accept="image/*" onChange={handleIconFile} className="hidden" data-testid="room-create-icon-input" />
           </div>
           {iconError && <p role="alert" className="text-xs text-rose-600 font-semibold mt-2">{iconError}</p>}
+          <ImagePickerModal
+            open={showIconPicker}
+            shape="room"
+            title="Foto ou GIF da sala"
+            initialUrl={iconUrl}
+            onClose={() => setShowIconPicker(false)}
+            onSelect={(url) => {
+              setIconError('');
+              setIconUrl(url);
+            }}
+          />
         </div>
 
         {/* Quem pode entrar */}

@@ -26,6 +26,7 @@ import {
   Music2,
 } from 'lucide-react';
 import { Avatar } from '@/components/common/Avatar';
+import { ImagePickerModal } from '@/components/common/ImagePickerModal';
 import { Sparkle } from '@/components/common/Sparkle';
 import { RoleBadge } from '@/components/modals/ParticipantModal';
 import { isActiveUntil, untilLabel, MUSIC_BOT_ID } from '@/context/MesaContext';
@@ -60,6 +61,7 @@ export function SidebarLeft() {
 
   const iconInputRef = useRef<HTMLInputElement>(null);
   const [iconBusy, setIconBusy] = useState(false);
+  const [showRoomIconPicker, setShowRoomIconPicker] = useState(false);
 
   const handleIconFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -181,14 +183,26 @@ export function SidebarLeft() {
                     <button
                       type="button"
                       data-testid="room-icon-button"
-                      title="Mudar a foto da sala"
+                      title="Mudar a foto ou GIF da sala"
                       disabled={iconBusy}
-                      onClick={() => iconInputRef.current?.click()}
+                      onClick={() => setShowRoomIconPicker(true)}
                       className="absolute -bottom-1 -right-1 p-1 rounded-full bg-[#ffd027] text-slate-950 hover:scale-110 transition-transform disabled:opacity-60"
                     >
                       <Camera className="w-3 h-3 stroke-[2.5]" />
                     </button>
                     <input ref={iconInputRef} type="file" accept="image/*" onChange={handleIconFile} className="hidden" data-testid="room-icon-input" />
+                    <ImagePickerModal
+                      open={showRoomIconPicker}
+                      shape="room"
+                      title="Foto ou GIF da sala"
+                      initialUrl={currentRoom.iconUrl}
+                      onClose={() => setShowRoomIconPicker(false)}
+                      onSelect={async (url) => {
+                        setIconBusy(true);
+                        await setRoomIcon(url);
+                        setIconBusy(false);
+                      }}
+                    />
                   </>
                 )}
               </div>

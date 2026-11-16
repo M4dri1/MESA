@@ -422,6 +422,7 @@ export function MesaProvider({ children }: { children: ReactNode }) {
   } | null>(null);
   const [accessInput, setAccessInput] = useState('');
   const [accessBusy, setAccessBusy] = useState(false);
+  const [switchPrompt, setSwitchPrompt] = useState<{ roomId: string; roomName: string; fromName: string } | null>(null);
 
   const [allMessages, setAllMessages] = useState<Record<string, ChatMessage[]>>({});
   const [olderMessages, setOlderMessages] = useState<Record<string, ChatMessage[]>>({});
@@ -1243,8 +1244,20 @@ export function MesaProvider({ children }: { children: ReactNode }) {
 
   const setCurrentRoomId = (id: string | null) => {
     if (id === roomIdRef.current) return;
-    if (!id) leaveRoom();
-    else void enterRoom(id);
+    if (!id) {
+      leaveRoom();
+      return;
+    }
+    if (roomIdRef.current && id !== roomIdRef.current) {
+      const target = rooms.find((r) => r.id === id);
+      setSwitchPrompt({
+        roomId: id,
+        roomName: target?.name || 'outra sala',
+        fromName: enteredRoom?.name || 'a sala atual',
+      });
+      return;
+    }
+    void enterRoom(id);
   };
 
   const createRoom = async (data: {
@@ -2307,13 +2320,27 @@ export function MesaProvider({ children }: { children: ReactNode }) {
   }): Promise<AuthResult> => {
     const body: Record<string, unknown> = { ...data };
     if (data.avatarUrl !== undefined) {
+      const raw = data.avatarUrl;
       body.avatarUrl =
-        data.avatarUrl === currentUser.avatarUrl ? undefined : data.avatarUrl ? await shrinkAvatar(data.avatarUrl) : '';
+        raw === currentUser.avatarUrl
+          ? undefined
+          : !raw
+          ? ''
+          : raw.startsWith('https://') || raw.startsWith('data:image/gif')
+          ? raw
+          : await shrinkAvatar(raw, 240);
       if (body.avatarUrl === undefined) delete body.avatarUrl;
     }
     if (data.bannerUrl !== undefined) {
+      const raw = data.bannerUrl;
       body.bannerUrl =
-        data.bannerUrl === currentUser.bannerUrl ? undefined : data.bannerUrl ? await shrinkBanner(data.bannerUrl) : '';
+        raw === currentUser.bannerUrl
+          ? undefined
+          : !raw
+          ? ''
+          : raw.startsWith('https://') || raw.startsWith('data:image/gif')
+          ? raw
+          : await shrinkBanner(raw);
       if (body.bannerUrl === undefined) delete body.bannerUrl;
     }
     const res = await api('/api/profile', { body, token: tokenRef.current });
@@ -2573,6 +2600,48 @@ export function MesaProvider({ children }: { children: ReactNode }) {
       }}
     >
       {children}
+      {switchPrompt && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#0b0f19]/75 animate-fadeIn"
+          onClick={() => setSwitchPrompt(null)}
+        >
+          <div
+            role="dialog"
+            aria-label="Trocar de sala"
+            data-testid="room-switch-modal"
+            onClick={(e) => e.stopPropagation()}
+            className="mesa-paper w-full max-w-md rounded-3xl bg-[#f6f5f0] text-slate-900 p-6 shadow-2xl space-y-4"
+          >
+            <div>
+              <h3 className="landing-display text-xl text-slate-950">Trocar de sala?</h3>
+              <p className="text-xs text-slate-600 mt-1.5 leading-relaxed">
+                Você está na chamada de <strong translate="no" className="text-slate-900">&ldquo;{switchPrompt.fromName}&rdquo;</strong>. Deseja sair dela para entrar em <strong translate="no" className="text-slate-900">&ldquo;{switchPrompt.roomName}&rdquo;</strong>?
+              </p>
+            </div>
+            <div className="flex items-center justify-end gap-2 pt-1">
+              <button
+                type="button"
+                onClick={() => setSwitchPrompt(null)}
+                className="h-10 px-4 rounded-full text-xs font-bold text-slate-700 hover:bg-slate-900/10"
+              >
+                Continuar aqui
+              </button>
+              <button
+                type="button"
+                data-testid="room-switch-confirm"
+                onClick={() => {
+                  const targetId = switchPrompt.roomId;
+                  setSwitchPrompt(null);
+                  void enterRoom(targetId);
+                }}
+                className="h-10 px-5 rounded-full bg-[#0b0f19] hover:bg-slate-800 text-white text-xs font-extrabold"
+              >
+                Sim, trocar de sala
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
       {accessPrompt && (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#0b0f19]/75 animate-fadeIn"

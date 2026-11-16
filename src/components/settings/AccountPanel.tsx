@@ -4,6 +4,7 @@ import React, { useRef, useState } from 'react';
 import { AtSign, Camera, Check, Image as ImageIcon, LogOut, Mail, Music2, Play, ShieldCheck, Trash2, Upload, User } from 'lucide-react';
 import { useMesa } from '@/context/MesaContext';
 import { Avatar } from '@/components/common/Avatar';
+import { ImagePickerModal } from '@/components/common/ImagePickerModal';
 import { playClip } from '@/utils/soundpadPlayer';
 import { playJoinRoomSound } from '@/utils/soundEffects';
 
@@ -25,6 +26,7 @@ export function AccountPanel({ onLogout }: { onLogout: () => void }) {
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [pickerTarget, setPickerTarget] = useState<'avatar' | 'banner' | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const bannerInputRef = useRef<HTMLInputElement>(null);
   const soundInputRef = useRef<HTMLInputElement>(null);
@@ -139,11 +141,11 @@ export function AccountPanel({ onLogout }: { onLogout: () => void }) {
             <div className="flex items-center gap-1.5">
               <button
                 type="button"
-                onClick={() => bannerInputRef.current?.click()}
+                onClick={() => setPickerTarget('banner')}
                 className="px-2.5 py-1 rounded-full bg-black/60 hover:bg-black/80 text-white text-[11px] font-bold flex items-center gap-1.5 backdrop-blur-sm transition-colors"
               >
                 <ImageIcon className="w-3.5 h-3.5" />
-                <span>{bannerUrl ? 'Trocar banner' : 'Adicionar banner'}</span>
+                <span>{bannerUrl ? 'Trocar banner / GIF' : 'Adicionar banner / GIF'}</span>
               </button>
               {bannerUrl && (
                 <button
@@ -160,12 +162,12 @@ export function AccountPanel({ onLogout }: { onLogout: () => void }) {
           </div>
 
           <div className="px-4 pb-4 pt-2 flex items-center gap-4">
-            <div className="relative -mt-9 flex-shrink-0 ring-4 ring-[#f6f5f0] rounded-full">
+            <div className="relative -mt-9 inline-flex flex-shrink-0 ring-4 ring-[#f6f5f0] rounded-full">
               <Avatar letter={letter} avatarUrl={avatarUrl} color={currentUser.avatarColor || '#2563eb'} size="lg" />
               <button
                 type="button"
-                onClick={() => fileInputRef.current?.click()}
-                title="Alterar foto de perfil"
+                onClick={() => setPickerTarget('avatar')}
+                title="Alterar foto de perfil ou GIF"
                 className="absolute -bottom-1 -right-1 p-1.5 rounded-full bg-[#ffd027] hover:bg-[#ffdd55] text-slate-950 transition-colors"
               >
                 <Camera className="w-3 h-3" />
@@ -173,10 +175,10 @@ export function AccountPanel({ onLogout }: { onLogout: () => void }) {
             </div>
             <div className="flex-1 min-w-0">
               <span className="text-xs font-bold text-slate-900 block">Foto de Perfil e Banner</span>
-              <span className="text-[11px] text-slate-500 block mb-1">Aparecem no seu cartão de perfil dentro das salas e chamadas.</span>
+              <span className="text-[11px] text-slate-500 block mb-1">Envie e posicione uma foto ou escolha um GIF animado.</span>
               <div className="flex items-center gap-3">
-                <button type="button" onClick={() => fileInputRef.current?.click()} className="text-xs font-bold text-[#3044f0] hover:text-[#2334c9]">
-                  {avatarUrl ? 'Trocar foto' : 'Enviar foto'}
+                <button type="button" onClick={() => setPickerTarget('avatar')} className="text-xs font-bold text-[#3044f0] hover:text-[#2334c9]">
+                  {avatarUrl ? 'Trocar foto / GIF' : 'Escolher foto / GIF'}
                 </button>
                 {avatarUrl && (
                   <button type="button" onClick={() => setAvatarUrl('')} className="text-xs font-medium text-rose-600 hover:text-rose-400 flex items-center gap-1">
@@ -188,6 +190,18 @@ export function AccountPanel({ onLogout }: { onLogout: () => void }) {
             <input ref={fileInputRef} type="file" accept="image/*" onChange={handlePhotoSelect} className="hidden" data-testid="profile-photo-input" />
           </div>
         </div>
+
+        <ImagePickerModal
+          open={pickerTarget !== null}
+          shape={pickerTarget === 'banner' ? 'banner' : 'avatar'}
+          title={pickerTarget === 'banner' ? 'Banner do perfil' : 'Foto de perfil'}
+          initialUrl={pickerTarget === 'banner' ? bannerUrl : avatarUrl}
+          onClose={() => setPickerTarget(null)}
+          onSelect={(url) => {
+            if (pickerTarget === 'banner') setBannerUrl(url);
+            else setAvatarUrl(url);
+          }}
+        />
 
         {/* Som de entrada na call (customizável, até 5s) */}
         <div className="p-3.5 rounded-2xl bg-[#f6f5f0] border border-slate-900/10 space-y-2">

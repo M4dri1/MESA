@@ -28,7 +28,7 @@ export function Avatar({
 
   return (
     <div
-      className={`relative inline-flex items-center justify-center rounded-full text-white  flex-shrink-0 select-none transition-transform overflow-hidden ${
+      className={`relative flex items-center justify-center rounded-full text-white flex-shrink-0 select-none transition-transform overflow-hidden ${
         sizeClasses[size]
       } ${isSpeaking ? 'ring-2 ring-emerald-400 ring-offset-2 ring-offset-[#0b0f19] animate-pulse-subtle' : ''} ${className}`}
       style={{ backgroundColor: avatarUrl ? 'transparent' : color }}
