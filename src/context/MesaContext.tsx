@@ -263,7 +263,7 @@ interface MesaContextType {
 
   // Soundpad: sons curtos que tocam para a chamada toda
   sounds: Sound[];
-  addSound: (file: File, options?: { name?: string; emoji?: string }) => Promise<{ ok: boolean; error?: string }>;
+  addSound: (file: File, options?: { name?: string; emoji?: string }) => Promise<{ ok: boolean; error?: string; soundId?: string }>;
   updateSound: (id: string, patch: { name?: string; emoji?: string; key?: string }) => Promise<{ ok: boolean; error?: string }>;
   deleteSound: (id: string) => void;
   playSound: (id: string) => void;
@@ -1616,10 +1616,12 @@ export function MesaProvider({ children }: { children: ReactNode }) {
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) return { ok: false, error: data.error || 'Não foi possível adicionar o som.' };
-      setSounds(data.sounds || []);
-      (data.sounds || []).forEach((sound: Sound) => preloadClip(sound.url));
+      const nextList: Sound[] = data.sounds || [];
+      setSounds(nextList);
+      nextList.forEach((sound: Sound) => preloadClip(sound.url));
       playSuccessSound();
-      return { ok: true };
+      const newest = nextList[nextList.length - 1];
+      return { ok: true, soundId: newest?.id };
     } catch {
       return { ok: false, error: 'Não foi possível enviar o som. Verifique sua conexão.' };
     }

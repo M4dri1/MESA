@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useEffect, useRef, useState } from 'react';
-import { AtSign, Camera, Check, Image as ImageIcon, LogOut, Mail, Music2, Play, ShieldCheck, Trash2, Upload, User } from 'lucide-react';
+import { AtSign, Camera, Check, ChevronDown, Image as ImageIcon, LogOut, Mail, Music2, Play, ShieldCheck, Trash2, Upload, User } from 'lucide-react';
 import { useMesa } from '@/context/MesaContext';
 import { Avatar } from '@/components/common/Avatar';
 import { ImagePickerModal } from '@/components/common/ImagePickerModal';
@@ -30,6 +30,7 @@ export function AccountPanel({
   const [bannerColor, setBannerColor] = useState<string>(currentUser.bannerColor || currentUser.avatarColor || '#2563eb');
   const [borderColor, setBorderColor] = useState<string>(currentUser.borderColor || '');
   const [joinSoundId, setJoinSoundId] = useState<string>(currentUser.joinSoundId || '');
+  const [soundMenuOpen, setSoundMenuOpen] = useState(false);
   const [uploadingSound, setUploadingSound] = useState(false);
   const [statusText, setStatusText] = useState(currentUser.statusText || 'Pronto para estudar');
   const [saving, setSaving] = useState(false);
@@ -92,6 +93,10 @@ export function AccountPanel({
     setUploadingSound(false);
     if (!res.ok) {
       setError(res.error || 'Não foi possível enviar o áudio.');
+      return;
+    }
+    if (res.soundId) {
+      setJoinSoundId(res.soundId);
     }
   };
 
@@ -316,20 +321,63 @@ export function AccountPanel({
             <input ref={soundInputRef} type="file" accept="audio/*" onChange={handleSoundUpload} className="hidden" />
           </div>
           <div className="flex items-center gap-2">
-            <select
-              id="profile-join-sound"
-              data-testid="profile-join-sound"
-              value={joinSoundId}
-              onChange={(e) => setJoinSoundId(e.target.value)}
-              className="flex-1 min-w-0 px-3 py-2 rounded-xl bg-white border border-slate-900/10 text-xs font-semibold text-slate-900 focus:outline-none focus:border-[#3044f0]"
-            >
-              <option value="">Som padrão do Mesa (sino suave)</option>
-              {sounds.map((s) => (
-                <option key={s.id} value={s.id}>
-                  {s.emoji} {s.name}
-                </option>
-              ))}
-            </select>
+            <div className="relative flex-1 min-w-0">
+              <button
+                type="button"
+                id="profile-join-sound"
+                data-testid="profile-join-sound"
+                aria-expanded={soundMenuOpen}
+                onClick={() => setSoundMenuOpen((v) => !v)}
+                className="w-full h-9 px-3.5 rounded-xl bg-white border border-slate-900/10 hover:border-[#3044f0] text-xs font-semibold text-slate-900 flex items-center justify-between gap-2 transition-colors focus:outline-none focus:border-[#3044f0]"
+              >
+                <span className="truncate">
+                  {(() => {
+                    const selected = sounds.find((s) => s.id === joinSoundId);
+                    return selected ? `${selected.emoji} ${selected.name}` : 'Som padrão do Mesa (sino suave)';
+                  })()}
+                </span>
+                <ChevronDown className={`w-4 h-4 text-slate-500 flex-shrink-0 transition-transform ${soundMenuOpen ? 'rotate-180' : ''}`} />
+              </button>
+
+              {soundMenuOpen && (
+                <div className="absolute left-0 right-0 top-10 z-30 rounded-xl bg-white border border-slate-900/10 shadow-xl p-1 max-h-48 overflow-y-auto space-y-0.5">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setJoinSoundId('');
+                      setSoundMenuOpen(false);
+                    }}
+                    className={`w-full px-3 py-2 rounded-lg text-left text-xs font-semibold flex items-center justify-between gap-2 transition-colors ${
+                      !joinSoundId ? 'bg-[#3044f0]/10 text-[#3044f0]' : 'text-slate-800 hover:bg-slate-900/5'
+                    }`}
+                  >
+                    <span className="truncate">Som padrão do Mesa (sino suave)</span>
+                    {!joinSoundId && <Check className="w-3.5 h-3.5 text-[#3044f0] flex-shrink-0" />}
+                  </button>
+                  {sounds.map((s) => {
+                    const active = joinSoundId === s.id;
+                    return (
+                      <button
+                        key={s.id}
+                        type="button"
+                        onClick={() => {
+                          setJoinSoundId(s.id);
+                          setSoundMenuOpen(false);
+                        }}
+                        className={`w-full px-3 py-2 rounded-lg text-left text-xs font-semibold flex items-center justify-between gap-2 transition-colors ${
+                          active ? 'bg-[#3044f0]/10 text-[#3044f0]' : 'text-slate-800 hover:bg-slate-900/5'
+                        }`}
+                      >
+                        <span className="truncate">
+                          {s.emoji} {s.name}
+                        </span>
+                        {active && <Check className="w-3.5 h-3.5 text-[#3044f0] flex-shrink-0" />}
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
             <button
               type="button"
               onClick={previewJoinSound}
