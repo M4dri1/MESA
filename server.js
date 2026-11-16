@@ -1915,7 +1915,9 @@ function handleSocketMessage(ws, msg) {
         }
       }
       if (msg.isHidden !== undefined && room.isPrivate) {
-        room.isHidden = !!msg.isHidden;
+        const nextHidden = !!msg.isHidden;
+        if (nextHidden && room.isHidden !== true) revokeOldMembers = true;
+        room.isHidden = nextHidden;
       }
       if (msg.password !== undefined && room.isPrivate) {
         const oldPass = room.password ? openText(room.password) : '';
