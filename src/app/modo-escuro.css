@@ -1,0 +1,320 @@
+/* GERADO por scripts/gerar-modo-escuro.js: não edite à mão. */
+
+/* O fundo do app (a moldura cobalto) escurece */
+html[data-mesa-mode="dark"] .mesa-frame {
+  background-color: #060913;
+}
+html[data-mesa-mode="dark"] .mesa-pill-ink {
+  background-color: #1b253d;
+}
+
+/* Campos nativos (data, cor, rolagem) também ficam escuros dentro do papel */
+html[data-mesa-mode="dark"] .mesa-paper,
+html[data-mesa-mode="dark"] .mesa-paper * {
+  color-scheme: dark;
+}
+
+html[data-mesa-mode="dark"] .mesa-paper {
+  color: #e1e6f2;
+}
+
+html[data-mesa-mode="dark"] .mesa-paper .bg-\[\#f6f5f0\],
+html[data-mesa-mode="dark"] .mesa-paper.bg-\[\#f6f5f0\] {
+  background-color:#0f1524;
+}
+
+html[data-mesa-mode="dark"] .mesa-paper .bg-white,
+html[data-mesa-mode="dark"] .mesa-paper.bg-white {
+  background-color:#192238;
+}
+
+html[data-mesa-mode="dark"] .mesa-paper .bg-slate-900\/5,
+html[data-mesa-mode="dark"] .mesa-paper.bg-slate-900\/5 {
+  background-color:rgba(255,255,255,.06);
+}
+
+html[data-mesa-mode="dark"] .mesa-paper .bg-slate-900\/10,
+html[data-mesa-mode="dark"] .mesa-paper.bg-slate-900\/10 {
+  background-color:rgba(255,255,255,.1);
+}
+
+html[data-mesa-mode="dark"] .mesa-paper .bg-slate-300,
+html[data-mesa-mode="dark"] .mesa-paper.bg-slate-300 {
+  background-color:#3a4663;
+}
+
+html[data-mesa-mode="dark"] .mesa-paper .bg-slate-400,
+html[data-mesa-mode="dark"] .mesa-paper.bg-slate-400 {
+  background-color:#56627f;
+}
+
+html[data-mesa-mode="dark"] .mesa-paper .bg-slate-900,
+html[data-mesa-mode="dark"] .mesa-paper.bg-slate-900 {
+  background-color:#2a3550;
+}
+
+html[data-mesa-mode="dark"] .mesa-paper .bg-slate-950,
+html[data-mesa-mode="dark"] .mesa-paper.bg-slate-950 {
+  background-color:#f2f4fa;color:#0b0f19;
+}
+
+html[data-mesa-mode="dark"] .mesa-paper .bg-\[\#0b0f19\],
+html[data-mesa-mode="dark"] .mesa-paper.bg-\[\#0b0f19\] {
+  background-color:#f2f4fa;color:#0b0f19;
+}
+
+html[data-mesa-mode="dark"] .mesa-paper .bg-\[\#ffd027\]\/60,
+html[data-mesa-mode="dark"] .mesa-paper.bg-\[\#ffd027\]\/60 {
+  background-color:rgba(255,208,39,.3);
+}
+
+html[data-mesa-mode="dark"] .mesa-paper .bg-\[\#ffd027\]\/50,
+html[data-mesa-mode="dark"] .mesa-paper.bg-\[\#ffd027\]\/50 {
+  background-color:rgba(255,208,39,.26);
+}
+
+html[data-mesa-mode="dark"] .mesa-paper .bg-\[\#ffd027\]\/35,
+html[data-mesa-mode="dark"] .mesa-paper.bg-\[\#ffd027\]\/35 {
+  background-color:rgba(255,208,39,.2);
+}
+
+html[data-mesa-mode="dark"] .mesa-paper .bg-\[\#ffd027\]\/25,
+html[data-mesa-mode="dark"] .mesa-paper.bg-\[\#ffd027\]\/25 {
+  background-color:rgba(255,208,39,.16);
+}
+
+html[data-mesa-mode="dark"] .mesa-paper .hover\:bg-slate-900\/5:hover,
+html[data-mesa-mode="dark"] .mesa-paper.hover\:bg-slate-900\/5:hover {
+  background-color:rgba(255,255,255,.1);
+}
+
+html[data-mesa-mode="dark"] .mesa-paper .hover\:bg-slate-900\/10:hover,
+html[data-mesa-mode="dark"] .mesa-paper.hover\:bg-slate-900\/10:hover {
+  background-color:rgba(255,255,255,.14);
+}
+
+html[data-mesa-mode="dark"] .mesa-paper .hover\:bg-slate-900\/\[0\.03\]:hover,
+html[data-mesa-mode="dark"] .mesa-paper.hover\:bg-slate-900\/\[0\.03\]:hover {
+  background-color:rgba(255,255,255,.05);
+}
+
+html[data-mesa-mode="dark"] .mesa-paper .hover\:bg-slate-900\/\[0\.04\]:hover,
+html[data-mesa-mode="dark"] .mesa-paper.hover\:bg-slate-900\/\[0\.04\]:hover {
+  background-color:rgba(255,255,255,.05);
+}
+
+html[data-mesa-mode="dark"] .mesa-paper .disabled\:hover\:bg-slate-900\/5:disabled:hover,
+html[data-mesa-mode="dark"] .mesa-paper.disabled\:hover\:bg-slate-900\/5:disabled:hover {
+  background-color:rgba(255,255,255,.06);
+}
+
+html[data-mesa-mode="dark"] .mesa-paper .hover\:bg-slate-800:hover,
+html[data-mesa-mode="dark"] .mesa-paper.hover\:bg-slate-800:hover {
+  background-color:#ffffff;
+}
+
+html[data-mesa-mode="dark"] .mesa-paper .hover\:bg-slate-900:hover,
+html[data-mesa-mode="dark"] .mesa-paper.hover\:bg-slate-900:hover {
+  background-color:#ffffff;
+}
+
+html[data-mesa-mode="dark"] .mesa-paper .hover\:bg-white:hover,
+html[data-mesa-mode="dark"] .mesa-paper.hover\:bg-white:hover {
+  background-color:#222d48;
+}
+
+html[data-mesa-mode="dark"] .mesa-paper .hover\:bg-\[\#f6f5f0\]:hover,
+html[data-mesa-mode="dark"] .mesa-paper.hover\:bg-\[\#f6f5f0\]:hover {
+  background-color:#222d48;
+}
+
+@media (min-width:640px) {
+html[data-mesa-mode="dark"] .mesa-paper .sm\:bg-slate-900\/5,
+html[data-mesa-mode="dark"] .mesa-paper.sm\:bg-slate-900\/5 {
+  background-color:rgba(255,255,255,.06);
+}
+}
+
+@media (min-width:768px) {
+html[data-mesa-mode="dark"] .mesa-paper .md\:bg-slate-900\/5,
+html[data-mesa-mode="dark"] .mesa-paper.md\:bg-slate-900\/5 {
+  background-color:rgba(255,255,255,.06);
+}
+}
+
+@media (min-width:640px) {
+html[data-mesa-mode="dark"] .mesa-paper .sm\:hover\:bg-slate-900\/10:hover,
+html[data-mesa-mode="dark"] .mesa-paper.sm\:hover\:bg-slate-900\/10:hover {
+  background-color:rgba(255,255,255,.14);
+}
+}
+
+@media (min-width:768px) {
+html[data-mesa-mode="dark"] .mesa-paper .md\:hover\:bg-slate-900\/10:hover,
+html[data-mesa-mode="dark"] .mesa-paper.md\:hover\:bg-slate-900\/10:hover {
+  background-color:rgba(255,255,255,.14);
+}
+}
+
+html[data-mesa-mode="dark"] .mesa-paper .text-slate-950,
+html[data-mesa-mode="dark"] .mesa-paper.text-slate-950 {
+  color:#f2f4fa;
+}
+
+html[data-mesa-mode="dark"] .mesa-paper .text-slate-900,
+html[data-mesa-mode="dark"] .mesa-paper.text-slate-900 {
+  color:#f2f4fa;
+}
+
+html[data-mesa-mode="dark"] .mesa-paper .text-slate-800,
+html[data-mesa-mode="dark"] .mesa-paper.text-slate-800 {
+  color:#e1e6f2;
+}
+
+html[data-mesa-mode="dark"] .mesa-paper .text-slate-700,
+html[data-mesa-mode="dark"] .mesa-paper.text-slate-700 {
+  color:#c8d0e2;
+}
+
+html[data-mesa-mode="dark"] .mesa-paper .text-slate-600,
+html[data-mesa-mode="dark"] .mesa-paper.text-slate-600 {
+  color:#aeb8cf;
+}
+
+html[data-mesa-mode="dark"] .mesa-paper .text-slate-500,
+html[data-mesa-mode="dark"] .mesa-paper.text-slate-500 {
+  color:#8f9bb5;
+}
+
+html[data-mesa-mode="dark"] .mesa-paper .text-slate-400,
+html[data-mesa-mode="dark"] .mesa-paper.text-slate-400 {
+  color:#6b7894;
+}
+
+@media (min-width:640px) {
+html[data-mesa-mode="dark"] .mesa-paper .sm\:text-slate-700,
+html[data-mesa-mode="dark"] .mesa-paper.sm\:text-slate-700 {
+  color:#c8d0e2;
+}
+}
+
+@media (min-width:768px) {
+html[data-mesa-mode="dark"] .mesa-paper .md\:text-slate-700,
+html[data-mesa-mode="dark"] .mesa-paper.md\:text-slate-700 {
+  color:#c8d0e2;
+}
+}
+
+html[data-mesa-mode="dark"] .mesa-paper .hover\:text-slate-950:hover,
+html[data-mesa-mode="dark"] .mesa-paper.hover\:text-slate-950:hover {
+  color:#ffffff;
+}
+
+html[data-mesa-mode="dark"] .mesa-paper .hover\:text-slate-800:hover,
+html[data-mesa-mode="dark"] .mesa-paper.hover\:text-slate-800:hover {
+  color:#f2f4fa;
+}
+
+html[data-mesa-mode="dark"] .mesa-paper .text-\[\#3044f0\],
+html[data-mesa-mode="dark"] .mesa-paper.text-\[\#3044f0\] {
+  color:#8da0ff;
+}
+
+html[data-mesa-mode="dark"] .mesa-paper .hover\:text-\[\#3044f0\]:hover,
+html[data-mesa-mode="dark"] .mesa-paper.hover\:text-\[\#3044f0\]:hover {
+  color:#8da0ff;
+}
+
+html[data-mesa-mode="dark"] .mesa-paper .group:hover .group-hover\:text-\[\#3044f0\] {
+  color:#8da0ff;
+}
+
+html[data-mesa-mode="dark"] .mesa-paper .hover\:text-\[\#2334c9\]:hover,
+html[data-mesa-mode="dark"] .mesa-paper.hover\:text-\[\#2334c9\]:hover {
+  color:#b0bdff;
+}
+
+html[data-mesa-mode="dark"] .mesa-paper .text-emerald-600,
+html[data-mesa-mode="dark"] .mesa-paper.text-emerald-600 {
+  color:#34d399;
+}
+
+html[data-mesa-mode="dark"] .mesa-paper .text-emerald-700,
+html[data-mesa-mode="dark"] .mesa-paper.text-emerald-700 {
+  color:#6ee7b7;
+}
+
+html[data-mesa-mode="dark"] .mesa-paper .text-rose-600,
+html[data-mesa-mode="dark"] .mesa-paper.text-rose-600 {
+  color:#fb7185;
+}
+
+html[data-mesa-mode="dark"] .mesa-paper .text-rose-700,
+html[data-mesa-mode="dark"] .mesa-paper.text-rose-700 {
+  color:#fda4af;
+}
+
+html[data-mesa-mode="dark"] .mesa-paper .hover\:text-rose-700:hover,
+html[data-mesa-mode="dark"] .mesa-paper.hover\:text-rose-700:hover {
+  color:#fecdd3;
+}
+
+html[data-mesa-mode="dark"] .mesa-paper .text-violet-700,
+html[data-mesa-mode="dark"] .mesa-paper.text-violet-700 {
+  color:#c4b5fd;
+}
+
+html[data-mesa-mode="dark"] .mesa-paper .placeholder-slate-400::placeholder,
+html[data-mesa-mode="dark"] .mesa-paper.placeholder-slate-400::placeholder {
+  color:#6b7894;
+}
+
+html[data-mesa-mode="dark"] .mesa-paper .placeholder-slate-500::placeholder,
+html[data-mesa-mode="dark"] .mesa-paper.placeholder-slate-500::placeholder {
+  color:#6b7894;
+}
+
+html[data-mesa-mode="dark"] .mesa-paper .border-slate-900\/10,
+html[data-mesa-mode="dark"] .mesa-paper.border-slate-900\/10 {
+  border-color:rgba(255,255,255,.1);
+}
+
+html[data-mesa-mode="dark"] .mesa-paper .border-slate-900\/15,
+html[data-mesa-mode="dark"] .mesa-paper.border-slate-900\/15 {
+  border-color:rgba(255,255,255,.14);
+}
+
+html[data-mesa-mode="dark"] .mesa-paper .border-slate-900\/25,
+html[data-mesa-mode="dark"] .mesa-paper.border-slate-900\/25 {
+  border-color:rgba(255,255,255,.22);
+}
+
+html[data-mesa-mode="dark"] .mesa-paper .border-slate-900\/30,
+html[data-mesa-mode="dark"] .mesa-paper.border-slate-900\/30 {
+  border-color:rgba(255,255,255,.28);
+}
+
+html[data-mesa-mode="dark"] .mesa-paper .hover\:border-slate-900\/30:hover,
+html[data-mesa-mode="dark"] .mesa-paper.hover\:border-slate-900\/30:hover {
+  border-color:rgba(255,255,255,.3);
+}
+
+html[data-mesa-mode="dark"] .mesa-paper .ring-\[\#f6f5f0\],
+html[data-mesa-mode="dark"] .mesa-paper.ring-\[\#f6f5f0\] {
+  --tw-ring-color:#0f1524;
+}
+
+html[data-mesa-mode="dark"] .mesa-paper .ring-offset-\[\#f6f5f0\],
+html[data-mesa-mode="dark"] .mesa-paper.ring-offset-\[\#f6f5f0\] {
+  --tw-ring-offset-color:#0f1524;
+}
+
+html[data-mesa-mode="dark"] .mesa-paper .ring-slate-950,
+html[data-mesa-mode="dark"] .mesa-paper.ring-slate-950 {
+  --tw-ring-color:#f2f4fa;
+}
+
+html[data-mesa-mode="dark"] .mesa-paper .bg-\[\#ffd027\].text-slate-950,
+html[data-mesa-mode="dark"] .mesa-paper.bg-\[\#ffd027\].text-slate-950 {
+  color: #0b0f19;
+}

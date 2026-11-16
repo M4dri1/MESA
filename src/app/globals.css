@@ -1,0 +1,148 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --background: #0b0f19;
+  --foreground: #f2f3f5;
+}
+
+body {
+  color: var(--foreground);
+  background: var(--background);
+  font-feature-settings: "rlig" 1, "calt" 1;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+}
+
+/* Custom dark scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: #0b0f19;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #1e293b;
+  border-radius: 9999px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #334155;
+}
+
+@keyframes voice-wave {
+  0%, 100% { height: 6px; }
+  50% { height: 18px; }
+}
+
+.voice-wave-bar {
+  animation: voice-wave 1s ease-in-out infinite alternate;
+}
+
+/* ---------- Tela inicial (landing) ---------- */
+.landing {
+  font-family: var(--font-body), -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+}
+
+/* Títulos de destaque dentro do app: a mesma fonte pesada e larga da tela inicial, sem forçar caixa alta */
+.mesa-display {
+  font-family: var(--font-display), "Arial Black", "Segoe UI", sans-serif;
+  font-weight: 900;
+  font-stretch: 112%;
+  line-height: 1.04;
+  letter-spacing: -0.01em;
+  text-wrap: balance;
+}
+
+/* Títulos largos e pesados, em caixa alta */
+.landing-display {
+  font-family: var(--font-display), "Arial Black", "Segoe UI", sans-serif;
+  font-weight: 900;
+  font-stretch: 125%;
+  text-transform: uppercase;
+  line-height: 0.98;
+  letter-spacing: -0.01em;
+  text-wrap: balance;
+}
+
+@keyframes landing-marquee {
+  to { transform: translateX(-50%); }
+}
+
+.landing-marquee {
+  display: flex;
+  width: max-content;
+  animation: landing-marquee 30s linear infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .landing-marquee,
+  .voice-wave-bar {
+    animation: none;
+  }
+}
+
+/* Rolagem horizontal sem barra visível (abas do palco no celular) */
+.no-scrollbar {
+  scrollbar-width: none;
+}
+
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+/* ---------- Acessibilidade (Configurações > Acessibilidade) ---------- */
+
+/* Tamanho do texto: tudo que usa rem acompanha; os textos em px dos rótulos pequenos também */
+html {
+  font-size: calc(100% * var(--mesa-scale, 1));
+}
+
+.text-\[9px\] { font-size: calc(9px * var(--mesa-scale, 1)); }
+.text-\[10px\] { font-size: calc(10px * var(--mesa-scale, 1)); }
+.text-\[11px\] { font-size: calc(11px * var(--mesa-scale, 1)); }
+.text-\[13px\] { font-size: calc(13px * var(--mesa-scale, 1)); }
+.text-\[15px\] { font-size: calc(15px * var(--mesa-scale, 1)); }
+
+/* Fonte escolhida: vale para o site todo (menos códigos e trechos de código) */
+html[data-mesa-font="readable"] { --mesa-font: "Atkinson Hyperlegible", "Segoe UI", Arial, sans-serif; }
+html[data-mesa-font="dyslexia"] { --mesa-font: "OpenDyslexic", "Comic Sans MS", "Segoe UI", sans-serif; }
+html[data-mesa-font="serif"] { --mesa-font: Georgia, Cambria, "Times New Roman", serif; }
+
+html[data-mesa-font] body,
+html[data-mesa-font] body :where(*):not(.font-mono):not(code):not(pre):not([data-font-sample]) {
+  font-family: var(--mesa-font) !important;
+}
+
+/* Modo daltonismo: filtros SVG criados em src/lib/preferences.ts */
+html[data-mesa-cb="protanopia"] { filter: url(#mesa-cb-protanopia); }
+html[data-mesa-cb="deuteranopia"] { filter: url(#mesa-cb-deuteranopia); }
+html[data-mesa-cb="tritanopia"] { filter: url(#mesa-cb-tritanopia); }
+
+/* Menos movimento: sem animações e transições longas */
+html[data-mesa-motion="reduce"] *,
+html[data-mesa-motion="reduce"] *::before,
+html[data-mesa-motion="reduce"] *::after {
+  animation-duration: 0.01ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0.01ms !important;
+  scroll-behavior: auto !important;
+}
+
+/* Idioma diferente do português: espera o texto ser traduzido para não piscar em português */
+html[data-mesa-lang]:not([data-mesa-ready]) body {
+  visibility: hidden;
+}
+
+/* Popups de entrar e criar conta: mesma fonte do texto da tela inicial */
+.auth-card {
+  font-family: var(--font-body), -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+}
+
+/* Hindi (devanágari) tem letras altas: os títulos grandes precisam de mais espaço entre as linhas */
+html[lang="hi"] .landing-display {
+  line-height: 1.3;
+}
