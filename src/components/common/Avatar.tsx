@@ -7,6 +7,7 @@ interface AvatarProps {
   letter: string;
   avatarUrl?: string;
   color?: string;
+  borderColor?: string;
   size?: 'sm' | 'md' | 'lg' | 'xl';
   isSpeaking?: boolean;
   className?: string;
@@ -16,6 +17,7 @@ export function Avatar({
   letter,
   avatarUrl,
   color = '#2563eb',
+  borderColor,
   size = 'md',
   isSpeaking = false,
   className = '',
@@ -32,7 +34,10 @@ export function Avatar({
       className={`relative flex items-center justify-center rounded-full text-white flex-shrink-0 select-none transition-transform overflow-hidden ${
         sizeClasses[size]
       } ${isSpeaking ? 'ring-2 ring-emerald-400 ring-offset-2 ring-offset-[#0b0f19] animate-pulse-subtle' : ''} ${className}`}
-      style={{ backgroundColor: avatarUrl ? 'transparent' : color }}
+      style={{
+        backgroundColor: avatarUrl ? 'transparent' : color,
+        ...(borderColor && !isSpeaking ? { boxShadow: `0 0 0 2px ${borderColor}` } : {}),
+      }}
     >
       {avatarUrl ? (
         // eslint-disable-next-line @next/next/no-img-element

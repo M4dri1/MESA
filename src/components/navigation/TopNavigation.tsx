@@ -71,7 +71,7 @@ export function TopNavigation() {
               className="h-10 pl-1 pr-3 sm:pr-4 rounded-full bg-white hover:bg-[#f6f5f0] flex items-center gap-2.5 transition-colors"
               title="Meu Perfil"
             >
-              <Avatar letter={currentUser.avatarLetter} avatarUrl={currentUser.avatarUrl} color={currentUser.avatarColor} size="sm" />
+              <Avatar letter={currentUser.avatarLetter} avatarUrl={currentUser.avatarUrl} color={currentUser.avatarColor} borderColor={currentUser.borderColor} size="sm" />
               <div className="hidden sm:flex flex-col text-left">
                 <span className="text-xs font-extrabold text-slate-950 leading-tight">{currentUser.name}</span>
                 <span className="text-[10px] text-slate-500 leading-tight font-semibold flex items-center gap-1">
@@ -87,15 +87,20 @@ export function TopNavigation() {
                 onMouseLeave={() => setShowUserMenu(false)}
                 className="mesa-paper absolute right-0 top-12 w-60 bg-[#f6f5f0] text-slate-900 rounded-2xl overflow-hidden z-50 animate-fadeIn shadow-[0_24px_48px_-12px_rgba(11,15,25,0.55)]"
               >
-                {currentUser.bannerUrl && (
-                  <div className="relative h-14 w-full overflow-hidden">
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img
-                      src={currentUser.bannerUrl}
-                      alt=""
-                      style={mediaTransformStyle(currentUser.bannerUrl)}
-                      className="w-full h-full object-cover"
-                    />
+                {(currentUser.bannerUrl || currentUser.bannerColor) && (
+                  <div
+                    className="relative h-14 w-full overflow-hidden"
+                    style={{ backgroundColor: currentUser.bannerColor || currentUser.avatarColor || '#2563eb' }}
+                  >
+                    {currentUser.bannerUrl && (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        src={currentUser.bannerUrl}
+                        alt=""
+                        style={mediaTransformStyle(currentUser.bannerUrl)}
+                        className="w-full h-full object-cover"
+                      />
+                    )}
                   </div>
                 )}
                 <div className="p-2">

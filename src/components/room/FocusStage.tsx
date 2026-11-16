@@ -106,6 +106,7 @@ export function FocusStage() {
   const screenStream = isMe ? localScreenStream : member ? getPeerStreams(member).screen : undefined;
   const name = isMe ? `${currentUser.name} (Você)` : member!.name;
   const avatarUrl = isMe ? currentUser.avatarUrl : member!.avatarUrl;
+  const borderColor = isMe ? currentUser.borderColor : member!.borderColor;
   const avatarColor = (isMe ? currentUser.avatarColor : member!.avatarColor) || '#2563eb';
   const avatarLetter = isMe ? currentUser.avatarLetter : member!.avatarLetter;
   const micOn = isMe ? isMicOn : !!member!.isMicOn;
@@ -166,7 +167,10 @@ export function FocusStage() {
       ) : (
         <div className="flex flex-col items-center gap-3">
           {avatarUrl ? (
-            <div className="w-28 h-28 sm:w-36 sm:h-36 rounded-full overflow-hidden ring-4 ring-white/15">
+            <div
+              className="w-28 h-28 sm:w-36 sm:h-36 rounded-full overflow-hidden ring-4 ring-white/15"
+              style={borderColor ? { boxShadow: `0 0 0 4px ${borderColor}` } : undefined}
+            >
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img src={avatarUrl} alt={name} style={mediaTransformStyle(avatarUrl)} className="w-full h-full object-cover" />
             </div>

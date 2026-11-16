@@ -327,7 +327,7 @@ export function ParticipantModal() {
       <div
         className="h-20 relative overflow-hidden"
         style={{
-          backgroundColor: member.avatarColor || '#2563eb',
+          backgroundColor: member.bannerColor || member.avatarColor || '#2563eb',
         }}
       >
         {member.bannerUrl && (
@@ -350,7 +350,13 @@ export function ParticipantModal() {
 
       <div className="px-4 pb-4">
         <div className="relative z-10 -mt-7 mb-2 flex items-end justify-between">
-          <div className="w-14 h-14 rounded-full ring-4 ring-[#f6f5f0] overflow-hidden flex items-center justify-center text-xl font-bold text-slate-900" style={{ backgroundColor: member.avatarColor || '#2563eb' }}>
+          <div
+            className="w-14 h-14 rounded-full overflow-hidden flex items-center justify-center text-xl font-bold text-slate-900"
+            style={{
+              backgroundColor: member.avatarColor || '#2563eb',
+              boxShadow: `0 0 0 4px ${member.borderColor || '#f6f5f0'}`,
+            }}
+          >
             {member.avatarUrl ? (
               // eslint-disable-next-line @next/next/no-img-element
               <img src={member.avatarUrl} alt="" style={mediaTransformStyle(member.avatarUrl)} className="w-full h-full object-cover" />

@@ -16,6 +16,8 @@ export interface User {
   email?: string;
   avatarUrl?: string; // Foto de perfil real
   bannerUrl?: string; // Foto de capa (banner) do perfil
+  bannerColor?: string; // Cor do banner quando não há foto/GIF
+  borderColor?: string; // Cor personalizada da borda em volta da foto de perfil
   joinSoundId?: string; // Som curto que toca quando a pessoa entra na call
   avatarLetter: string;
   avatarColor: string;

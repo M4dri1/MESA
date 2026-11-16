@@ -27,6 +27,8 @@ export function AccountPanel({
   const [nickname, setNickname] = useState(currentUser.name || '');
   const [avatarUrl, setAvatarUrl] = useState<string>(currentUser.avatarUrl || '');
   const [bannerUrl, setBannerUrl] = useState<string>(currentUser.bannerUrl || '');
+  const [bannerColor, setBannerColor] = useState<string>(currentUser.bannerColor || currentUser.avatarColor || '#2563eb');
+  const [borderColor, setBorderColor] = useState<string>(currentUser.borderColor || '');
   const [joinSoundId, setJoinSoundId] = useState<string>(currentUser.joinSoundId || '');
   const [uploadingSound, setUploadingSound] = useState(false);
   const [statusText, setStatusText] = useState(currentUser.statusText || 'Pronto para estudar');
@@ -113,6 +115,8 @@ export function AccountPanel({
       name: nickname.trim() || fullName.trim().split(' ')[0] || 'Estudante',
       avatarUrl,
       bannerUrl,
+      bannerColor,
+      borderColor,
       joinSoundId,
       statusText: statusText.trim(),
     });
@@ -136,6 +140,8 @@ export function AccountPanel({
     nickname.trim() !== (currentUser.name || '') ||
     avatarUrl !== (currentUser.avatarUrl || '') ||
     bannerUrl !== (currentUser.bannerUrl || '') ||
+    bannerColor !== (currentUser.bannerColor || currentUser.avatarColor || '#2563eb') ||
+    borderColor !== (currentUser.borderColor || '') ||
     joinSoundId !== (currentUser.joinSoundId || '') ||
     statusText.trim() !== (currentUser.statusText || 'Pronto para estudar');
 
@@ -163,7 +169,7 @@ export function AccountPanel({
           <div
             className="relative h-28 w-full flex items-end justify-end p-2.5 overflow-hidden"
             style={{
-              backgroundColor: currentUser.avatarColor || '#2563eb',
+              backgroundColor: bannerColor || currentUser.avatarColor || '#2563eb',
             }}
           >
             {bannerUrl && (
@@ -199,7 +205,10 @@ export function AccountPanel({
           </div>
 
           <div className="px-4 pb-4 pt-2 flex items-center gap-4">
-            <div className="relative -mt-9 inline-flex flex-shrink-0 ring-4 ring-[#f6f5f0] rounded-full">
+            <div
+              className="relative -mt-9 inline-flex flex-shrink-0 rounded-full"
+              style={{ boxShadow: `0 0 0 4px ${borderColor || '#f6f5f0'}` }}
+            >
               <Avatar letter={letter} avatarUrl={avatarUrl} color={currentUser.avatarColor || '#2563eb'} size="lg" />
               <button
                 type="button"
@@ -225,6 +234,50 @@ export function AccountPanel({
               </div>
             </div>
             <input ref={fileInputRef} type="file" accept="image/*" onChange={handlePhotoSelect} className="hidden" data-testid="profile-photo-input" />
+          </div>
+
+          {/* Cores do perfil: Cor do banner (quando não tem foto) e Cor da borda da foto */}
+          <div className="px-4 pb-4 pt-2 border-t border-slate-900/10 grid grid-cols-1 sm:grid-cols-2 gap-3 items-stretch">
+            <label className="p-2.5 rounded-xl bg-white border border-slate-900/10 cursor-pointer flex flex-col justify-between">
+              <div>
+                <span className="block text-xs font-bold text-slate-900">Cor do banner</span>
+                <span className="block text-[11px] text-slate-500 mb-1.5">Aparece quando você não usa foto no banner</span>
+              </div>
+              <input
+                type="color"
+                data-testid="profile-banner-color"
+                value={bannerColor}
+                onChange={(e) => setBannerColor(e.target.value)}
+                className="w-full h-8 rounded-lg bg-transparent cursor-pointer"
+              />
+            </label>
+            <label className="p-2.5 rounded-xl bg-white border border-slate-900/10 cursor-pointer flex flex-col justify-between">
+              <div className="flex items-start justify-between gap-1">
+                <div>
+                  <span className="block text-xs font-bold text-slate-900">Cor da borda da foto</span>
+                  <span className="block text-[11px] text-slate-500 mb-1.5">Contorno exclusivo em volta do seu avatar</span>
+                </div>
+                {borderColor && (
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      setBorderColor('');
+                    }}
+                    className="text-[10px] font-bold text-[#3044f0] hover:underline flex-shrink-0"
+                  >
+                    Padrão
+                  </button>
+                )}
+              </div>
+              <input
+                type="color"
+                data-testid="profile-border-color"
+                value={borderColor || '#ffd027'}
+                onChange={(e) => setBorderColor(e.target.value)}
+                className="w-full h-8 rounded-lg bg-transparent cursor-pointer"
+              />
+            </label>
           </div>
         </div>
 

@@ -105,7 +105,12 @@ export function RoomCard({ room, onEnter }: RoomCardProps) {
             {isOnline && room.members.length > 0 && (
               <div className="flex items-center -space-x-1.5">
                 {room.members.slice(0, 4).map((member, idx) => (
-                  <div key={member.id || idx} className="inline-flex ring-2 ring-[#f6f5f0] rounded-full" title={member.name}>
+                  <div
+                    key={member.id || idx}
+                    className="inline-flex rounded-full"
+                    style={{ boxShadow: `0 0 0 2px ${member.borderColor || '#f6f5f0'}` }}
+                    title={member.name}
+                  >
                     <Avatar letter={member.avatarLetter} avatarUrl={member.avatarUrl} color={member.avatarColor} size="sm" />
                   </div>
                 ))}

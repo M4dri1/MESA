@@ -124,7 +124,10 @@ export function VideoGrid({ strip = false }: { strip?: boolean }) {
             {camera ? (
               <StreamVideo stream={camera} className="w-full h-full object-cover" />
             ) : member.avatarUrl ? (
-              <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-full overflow-hidden ring-2 ring-white/20 ">
+              <div
+                className="w-14 h-14 sm:w-16 sm:h-16 rounded-full overflow-hidden ring-2 ring-white/20"
+                style={member.borderColor ? { boxShadow: `0 0 0 2.5px ${member.borderColor}` } : undefined}
+              >
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img src={member.avatarUrl} alt={member.name} style={mediaTransformStyle(member.avatarUrl)} className="w-full h-full object-cover" />
               </div>
@@ -224,7 +227,10 @@ export function VideoGrid({ strip = false }: { strip?: boolean }) {
           {isCameraOn && localCameraStream ? (
             <StreamVideo stream={localCameraStream} mirrored className="w-full h-full object-cover" />
           ) : currentUser.avatarUrl ? (
-            <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-full overflow-hidden ring-2 ring-white/20 ">
+            <div
+              className="w-14 h-14 sm:w-16 sm:h-16 rounded-full overflow-hidden ring-2 ring-white/20"
+              style={currentUser.borderColor ? { boxShadow: `0 0 0 2.5px ${currentUser.borderColor}` } : undefined}
+            >
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img src={currentUser.avatarUrl} alt={currentUser.name} style={mediaTransformStyle(currentUser.avatarUrl)} className="w-full h-full object-cover" />
             </div>

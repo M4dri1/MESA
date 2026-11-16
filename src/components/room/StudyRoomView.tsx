@@ -166,6 +166,7 @@ export function StudyRoomView() {
                     letter={member.avatarLetter}
                     avatarUrl={member.avatarUrl}
                     color={member.avatarColor}
+                    borderColor={member.borderColor}
                     size="sm"
                   />
                 </button>
@@ -180,6 +181,7 @@ export function StudyRoomView() {
                   letter={currentUser.avatarLetter}
                   avatarUrl={currentUser.avatarUrl}
                   color={currentUser.avatarColor}
+                  borderColor={currentUser.borderColor}
                   size="sm"
                 />
               </button>

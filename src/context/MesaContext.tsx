@@ -124,6 +124,8 @@ interface MesaContextType {
     name: string;
     avatarUrl?: string;
     bannerUrl?: string;
+    bannerColor?: string;
+    borderColor?: string;
     joinSoundId?: string;
     statusText?: string;
   }) => Promise<AuthResult>;
@@ -2315,6 +2317,8 @@ export function MesaProvider({ children }: { children: ReactNode }) {
     name: string;
     avatarUrl?: string;
     bannerUrl?: string;
+    bannerColor?: string;
+    borderColor?: string;
     joinSoundId?: string;
     statusText?: string;
   }): Promise<AuthResult> => {

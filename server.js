@@ -313,6 +313,8 @@ function publicUser(u) {
     fullName: u.fullName,
     avatarUrl: u.avatarUrl || '',
     bannerUrl: u.bannerUrl || '',
+    bannerColor: u.bannerColor || u.avatarColor || '#2563eb',
+    borderColor: u.borderColor || '',
     avatarLetter: (u.nickname[0] || '?').toUpperCase(),
     avatarColor: u.avatarColor,
     statusText: u.statusText || '',
@@ -1364,6 +1366,14 @@ async function handleApi(req, res, url) {
       const bannerError = validateBanner(body.bannerUrl);
       if (bannerError) return json(res, 400, { error: bannerError, field: 'banner' });
       user.bannerUrl = body.bannerUrl || '';
+    }
+    if (body.bannerColor !== undefined) {
+      const bc = String(body.bannerColor || '').trim();
+      user.bannerColor = /^#[0-9a-fA-F]{6}$/.test(bc) ? bc : '';
+    }
+    if (body.borderColor !== undefined) {
+      const bdc = String(body.borderColor || '').trim();
+      user.borderColor = /^#[0-9a-fA-F]{6}$/.test(bdc) ? bdc : '';
     }
     if (body.joinSoundId !== undefined) {
       user.joinSoundId = String(body.joinSoundId || '').slice(0, 60);

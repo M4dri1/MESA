@@ -275,6 +275,7 @@ export function SidebarLeft() {
                       letter={member.avatarLetter}
                       avatarUrl={member.avatarUrl}
                       color={member.avatarColor}
+                      borderColor={member.borderColor}
                       size="sm"
                       isSpeaking={!!member.isSpeaking && !!member.isMicOn}
                     />
@@ -352,6 +353,7 @@ export function SidebarLeft() {
                       letter={currentUser.avatarLetter}
                       avatarUrl={currentUser.avatarUrl}
                       color={currentUser.avatarColor}
+                      borderColor={currentUser.borderColor}
                       size="sm"
                       isSpeaking={isMicOn && audioVolumeLevel > 15}
                     />
@@ -469,7 +471,7 @@ export function SidebarLeft() {
               className="flex items-center gap-2 cursor-pointer hover:opacity-85 transition-opacity flex-1 min-w-0"
               title="Minha conta"
             >
-              <Avatar letter={currentUser.avatarLetter} avatarUrl={currentUser.avatarUrl} color={currentUser.avatarColor} size="sm" />
+              <Avatar letter={currentUser.avatarLetter} avatarUrl={currentUser.avatarUrl} color={currentUser.avatarColor} borderColor={currentUser.borderColor} size="sm" />
               <div className="flex flex-col truncate">
                 <span className="text-xs font-bold text-white truncate">{currentUser.name}</span>
                 <span className="text-[10px] text-emerald-400">Conectado</span>
