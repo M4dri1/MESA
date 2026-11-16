@@ -1900,6 +1900,7 @@ function handleSocketMessage(ws, msg) {
           changes.push(`mudou a matéria da sala para "${subject}"`);
         }
       }
+      let revokeOldMembers = false;
       if (msg.isPrivate !== undefined) {
         const isPrivate = !!msg.isPrivate;
         if (isPrivate !== !!room.isPrivate) {
@@ -1907,6 +1908,8 @@ function handleSocketMessage(ws, msg) {
           if (!isPrivate) {
             room.isHidden = false;
             room.password = '';
+          } else {
+            revokeOldMembers = true;
           }
           changes.push(isPrivate ? 'deixou a sala privada (só entra com convite)' : 'deixou a sala aberta (entra quem tiver o link)');
         }
@@ -1915,8 +1918,15 @@ function handleSocketMessage(ws, msg) {
         room.isHidden = !!msg.isHidden;
       }
       if (msg.password !== undefined && room.isPrivate) {
+        const oldPass = room.password ? openText(room.password) : '';
         const nextPass = String(msg.password || '').trim().slice(0, 60);
         room.password = nextPass ? sealText(nextPass) : '';
+        if (nextPass && nextPass !== oldPass) revokeOldMembers = true;
+      }
+      if (revokeOldMembers && room.isPrivate) {
+        const keep = new Set([room.ownerId, ...(room.adminIds || []), ...callOf(room.id).keys()]);
+        room.memberIds = room.memberIds.filter((id) => keep.has(id));
+        if (!room.memberIds.includes(room.ownerId)) room.memberIds.unshift(room.ownerId);
       }
       if (msg.color !== undefined) {
         const color = String(msg.color);
