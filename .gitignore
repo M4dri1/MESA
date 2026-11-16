@@ -1,0 +1,36 @@
+# Dependências e builds
+node_modules/
+.next/
+.next-dev/
+.next-test/
+out/
+build/
+tsconfig.tsbuildinfo
+next-env.d.ts
+
+# Dados locais e uploads
+data/
+
+# Chaves, credenciais e configurações sensíveis
+key/
+*.config.json
+*.example.json
+.env
+.env.*
+*.pem
+*.key
+
+# Binários, protótipos antigos e utilitários locais
+*.exe
+scripts/
+tests/
+src/components/mobile/
+src/data/
+
+# Documentação interna
+*.md
+
+# Sistema
+.DS_Store
+Thumbs.db
+*.log
