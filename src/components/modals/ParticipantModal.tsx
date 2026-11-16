@@ -3,6 +3,7 @@
 import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { useMesa, isActiveUntil, untilLabel, ModerationDuration, MUSIC_BOT_ID } from '@/context/MesaContext';
 import { RoomRole } from '@/types';
+import { mediaTransformStyle } from '@/utils/mediaTransform';
 import { X, Volume2, VolumeX, Crown, Shield, ShieldOff, Clock, Undo2, Mic, MicOff, ChevronDown, Music2, Power, Maximize2 } from 'lucide-react';
 
 const RANK: Record<RoomRole, number> = { owner: 3, admin: 2, member: 1 };
@@ -324,16 +325,24 @@ export function ParticipantModal() {
     >
       {/* Faixa colorida / banner + avatar, como um cartão de perfil */}
       <div
-        className="h-20 relative bg-cover bg-center"
+        className="h-20 relative overflow-hidden"
         style={{
           backgroundColor: member.avatarColor || '#2563eb',
-          backgroundImage: member.bannerUrl ? `url(${member.bannerUrl})` : undefined,
         }}
       >
+        {member.bannerUrl && (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={member.bannerUrl}
+            alt=""
+            style={mediaTransformStyle(member.bannerUrl)}
+            className="absolute inset-0 w-full h-full object-cover pointer-events-none"
+          />
+        )}
         <button
           onClick={close}
           title="Fechar"
-          className="absolute top-2 right-2 p-1 rounded-full bg-black/30 text-white/90 hover:bg-black/50 transition-colors"
+          className="absolute top-2 right-2 z-10 p-1 rounded-full bg-black/30 text-white/90 hover:bg-black/50 transition-colors"
         >
           <X className="w-4 h-4" />
         </button>
@@ -344,7 +353,7 @@ export function ParticipantModal() {
           <div className="w-14 h-14 rounded-full ring-4 ring-[#f6f5f0] overflow-hidden flex items-center justify-center text-xl font-bold text-slate-900" style={{ backgroundColor: member.avatarColor || '#2563eb' }}>
             {member.avatarUrl ? (
               // eslint-disable-next-line @next/next/no-img-element
-              <img src={member.avatarUrl} alt="" className="w-full h-full object-cover" />
+              <img src={member.avatarUrl} alt="" style={mediaTransformStyle(member.avatarUrl)} className="w-full h-full object-cover" />
             ) : (
               member.avatarLetter
             )}

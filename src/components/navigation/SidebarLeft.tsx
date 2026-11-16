@@ -27,6 +27,7 @@ import {
 } from 'lucide-react';
 import { Avatar } from '@/components/common/Avatar';
 import { ImagePickerModal } from '@/components/common/ImagePickerModal';
+import { mediaTransformStyle } from '@/utils/mediaTransform';
 import { Sparkle } from '@/components/common/Sparkle';
 import { RoleBadge } from '@/components/modals/ParticipantModal';
 import { isActiveUntil, untilLabel, MUSIC_BOT_ID } from '@/context/MesaContext';
@@ -132,8 +133,10 @@ export function SidebarLeft() {
               >
                 {isActive && <span className="absolute -left-[14px] w-1.5 h-8 bg-white rounded-r-full" />}
                 {dock.iconUrl ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img src={dock.iconUrl} alt={dock.name} className="absolute inset-0 w-full h-full object-cover rounded-[inherit]" />
+                  <span className="absolute inset-0 overflow-hidden rounded-[inherit]">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={dock.iconUrl} alt={dock.name} style={mediaTransformStyle(dock.iconUrl)} className="w-full h-full object-cover" />
+                  </span>
                 ) : (
                   dock.label
                 )}
@@ -172,7 +175,7 @@ export function SidebarLeft() {
                 >
                   {currentRoom.iconUrl ? (
                     // eslint-disable-next-line @next/next/no-img-element
-                    <img src={currentRoom.iconUrl} alt="Foto da sala" className="w-full h-full object-cover" />
+                    <img src={currentRoom.iconUrl} alt="Foto da sala" style={mediaTransformStyle(currentRoom.iconUrl)} className="w-full h-full object-cover" />
                   ) : (
                     currentRoom.name.split(/[\s·-]+/).filter(Boolean).slice(0, 2).map((word) => word[0]).join('').toUpperCase()
                   )}

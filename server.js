@@ -338,8 +338,10 @@ function validateNickname(nickname) {
   if (!/^[\p{L}\p{N}_.-]+$/u.test(value)) return 'Use só letras, números, ponto, hífen ou _ no nickname (sem espaços).';
   return null;
 }
+const POS_HASH_RE = /(?:#pos=-?\d+(?:\.\d+)?,-?\d+(?:\.\d+)?,\d+(?:\.\d+)?)?$/;
+
 function isAllowedMediaUrl(url) {
-  if (typeof url !== 'string' || url.length > 500) return false;
+  if (typeof url !== 'string' || url.length > 560) return false;
   return /^https:\/\/([a-z0-9-]+\.)*(giphy\.com|tenor\.com|klipy\.co|imgur\.com)\/[^\s"'<>]+$/i.test(url);
 }
 
@@ -347,14 +349,16 @@ function isAllowedMediaUrl(url) {
 function validateRoomIcon(icon) {
   if (!icon) return '';
   if (isAllowedMediaUrl(icon)) return '';
-  if (!/^data:image\/(png|jpeg|webp|gif);base64,[A-Za-z0-9+/=]+$/.test(icon) || icon.length > 450000) return 'Imagem inválida ou grande demais.';
+  if (!new RegExp(`^data:image\\/(png|jpeg|webp|gif);base64,[A-Za-z0-9+/=]+${POS_HASH_RE.source}$`).test(icon) || icon.length > 450000) {
+    return 'Imagem inválida ou grande demais.';
+  }
   return '';
 }
 
 function validateAvatar(avatarUrl) {
   if (!avatarUrl) return null;
   if (isAllowedMediaUrl(avatarUrl)) return null;
-  if (typeof avatarUrl !== 'string' || !/^data:image\/(png|jpeg|webp|gif);base64,/.test(avatarUrl)) {
+  if (typeof avatarUrl !== 'string' || !new RegExp(`^data:image\\/(png|jpeg|webp|gif);base64,[A-Za-z0-9+/=]+${POS_HASH_RE.source}$`).test(avatarUrl)) {
     return 'Foto de perfil inválida.';
   }
   if (avatarUrl.length > 450000) return 'A foto de perfil é grande demais.';
@@ -364,7 +368,7 @@ function validateAvatar(avatarUrl) {
 function validateBanner(bannerUrl) {
   if (!bannerUrl) return null;
   if (isAllowedMediaUrl(bannerUrl)) return null;
-  if (typeof bannerUrl !== 'string' || !/^data:image\/(png|jpeg|webp|gif);base64,/.test(bannerUrl)) {
+  if (typeof bannerUrl !== 'string' || !new RegExp(`^data:image\\/(png|jpeg|webp|gif);base64,[A-Za-z0-9+/=]+${POS_HASH_RE.source}$`).test(bannerUrl)) {
     return 'Banner inválido.';
   }
   if (bannerUrl.length > 500000) return 'A imagem de capa é grande demais.';

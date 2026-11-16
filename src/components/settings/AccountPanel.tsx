@@ -1,10 +1,11 @@
 'use client';
 
-import React, { useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { AtSign, Camera, Check, Image as ImageIcon, LogOut, Mail, Music2, Play, ShieldCheck, Trash2, Upload, User } from 'lucide-react';
 import { useMesa } from '@/context/MesaContext';
 import { Avatar } from '@/components/common/Avatar';
 import { ImagePickerModal } from '@/components/common/ImagePickerModal';
+import { mediaTransformStyle } from '@/utils/mediaTransform';
 import { playClip } from '@/utils/soundpadPlayer';
 import { playJoinRoomSound } from '@/utils/soundEffects';
 
@@ -13,7 +14,13 @@ const fieldClass =
 const labelClass = 'text-xs font-bold text-slate-700 block mb-1.5';
 
 /** Seção "Minha conta": foto, banner, som de entrada, nome, nickname e status. É aqui que se edita o perfil. */
-export function AccountPanel({ onLogout }: { onLogout: () => void }) {
+export function AccountPanel({
+  onLogout,
+  onDirtyChange,
+}: {
+  onLogout: () => void;
+  onDirtyChange?: (dirty: boolean, saveNow: () => Promise<boolean>) => void;
+}) {
   const { currentUser, updateUserProfile, sounds, addSound, padVolume } = useMesa();
 
   const [fullName, setFullName] = useState(currentUser.fullName || currentUser.name || '');
@@ -96,9 +103,8 @@ export function AccountPanel({ onLogout }: { onLogout: () => void }) {
     else playJoinRoomSound();
   };
 
-  const handleSave = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (saving) return;
+  const performSave = async (): Promise<boolean> => {
+    if (saving) return false;
     setSaving(true);
     setError(null);
     setSaved(false);
@@ -113,11 +119,34 @@ export function AccountPanel({ onLogout }: { onLogout: () => void }) {
     setSaving(false);
     if (!result.success) {
       setError(result.error || 'Não foi possível salvar o perfil.');
-      return;
+      return false;
     }
     setSaved(true);
     window.setTimeout(() => setSaved(false), 3000);
+    return true;
   };
+
+  const handleSave = async (e: React.FormEvent) => {
+    e.preventDefault();
+    await performSave();
+  };
+
+  const isDirty =
+    fullName.trim() !== (currentUser.fullName || currentUser.name || '') ||
+    nickname.trim() !== (currentUser.name || '') ||
+    avatarUrl !== (currentUser.avatarUrl || '') ||
+    bannerUrl !== (currentUser.bannerUrl || '') ||
+    joinSoundId !== (currentUser.joinSoundId || '') ||
+    statusText.trim() !== (currentUser.statusText || 'Pronto para estudar');
+
+  const saveRef = useRef(performSave);
+  saveRef.current = performSave;
+
+  useEffect(() => {
+    if (onDirtyChange) {
+      onDirtyChange(isDirty, () => saveRef.current());
+    }
+  }, [isDirty, onDirtyChange]);
 
   const letter = (nickname.trim()[0] || fullName.trim()[0] || 'U').toUpperCase();
 
@@ -132,13 +161,21 @@ export function AccountPanel({ onLogout }: { onLogout: () => void }) {
         {/* Cartão de Perfil com Banner + Foto */}
         <div className="rounded-2xl bg-[#f6f5f0] border border-slate-900/10 overflow-hidden">
           <div
-            className="relative h-28 w-full flex items-end justify-end p-2.5 bg-cover bg-center"
+            className="relative h-28 w-full flex items-end justify-end p-2.5 overflow-hidden"
             style={{
               backgroundColor: currentUser.avatarColor || '#2563eb',
-              backgroundImage: bannerUrl ? `url(${bannerUrl})` : undefined,
             }}
           >
-            <div className="flex items-center gap-1.5">
+            {bannerUrl && (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={bannerUrl}
+                alt="Banner"
+                style={mediaTransformStyle(bannerUrl)}
+                className="absolute inset-0 w-full h-full object-cover pointer-events-none"
+              />
+            )}
+            <div className="relative z-10 flex items-center gap-1.5">
               <button
                 type="button"
                 onClick={() => setPickerTarget('banner')}

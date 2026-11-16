@@ -9,6 +9,7 @@ import { shrinkAvatar } from '@/lib/api';
 import { normalizeRoomColor } from '@/utils/roomColor';
 import { COLOR_OPTIONS } from './CreateRoomModal';
 import { ImagePickerModal } from '@/components/common/ImagePickerModal';
+import { mediaTransformStyle } from '@/utils/mediaTransform';
 
 /** Configurações de uma sala que já existe: nome, matéria, quem pode entrar, cor e foto (dono e adm) */
 export function RoomSettingsModal() {
@@ -35,10 +36,27 @@ function RoomSettingsForm({ room }: { room: Room }) {
   const [showIconPicker, setShowIconPicker] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
+  const [showUnsavedPrompt, setShowUnsavedPrompt] = useState(false);
   const iconInputRef = useRef<HTMLInputElement>(null);
 
   const canEdit = room.myRole === 'owner' || room.myRole === 'admin';
   const isPreset = COLOR_OPTIONS.some((col) => col.value === color);
+  const isDirty =
+    name.trim() !== room.name ||
+    (subject.trim() || 'Geral') !== room.subject ||
+    color !== (room.color || COLOR_OPTIONS[0].value) ||
+    isPrivate !== !!room.isPrivate ||
+    (isPrivate && isHidden !== (room.isHidden !== false)) ||
+    passwordChanged ||
+    iconChanged;
+
+  const requestClose = () => {
+    if (canEdit && isDirty) {
+      setShowUnsavedPrompt(true);
+      return;
+    }
+    closeRoomSettings();
+  };
 
   const handleIconFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -102,7 +120,7 @@ function RoomSettingsForm({ room }: { room: Room }) {
           {room.myRole === 'owner' ? 'Você é o dono' : room.myRole === 'admin' ? 'Você é adm' : 'Você é membro'}
         </>
       }
-      onClose={closeRoomSettings}
+      onClose={requestClose}
       width="max-w-4xl"
     >
       <form onSubmit={handleSave} className="space-y-5" role="dialog" aria-modal="true" aria-label="Configurações da sala">
@@ -309,7 +327,7 @@ function RoomSettingsForm({ room }: { room: Room }) {
                 >
                   {iconUrl ? (
                     // eslint-disable-next-line @next/next/no-img-element
-                    <img src={iconUrl} alt="" className="w-full h-full object-cover" />
+                    <img src={iconUrl} alt="" style={mediaTransformStyle(iconUrl)} className="w-full h-full object-cover" />
                   ) : (
                     <Camera className="w-5 h-5" />
                   )}
@@ -356,7 +374,7 @@ function RoomSettingsForm({ room }: { room: Room }) {
             )}
 
             <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-900/10">
-              <button type="button" data-testid="room-settings-cancel" onClick={closeRoomSettings} className={BTN_GHOST}>
+              <button type="button" data-testid="room-settings-cancel" onClick={requestClose} className={BTN_GHOST}>
                 Cancelar
               </button>
               <button type="submit" data-testid="room-settings-save" disabled={saving} className={BTN_PRIMARY}>
@@ -366,6 +384,57 @@ function RoomSettingsForm({ room }: { room: Room }) {
           </>
         )}
       </form>
+
+      {showUnsavedPrompt && (
+        <div
+          className="fixed inset-0 z-[70] flex items-center justify-center p-4 bg-[#0b0f19]/75 animate-fadeIn"
+          onClick={() => setShowUnsavedPrompt(false)}
+        >
+          <div
+            role="alertdialog"
+            aria-label="Alterações não salvas"
+            onClick={(e) => e.stopPropagation()}
+            className="mesa-paper w-full max-w-md rounded-3xl bg-[#f6f5f0] text-slate-900 p-6 shadow-2xl space-y-4 border border-slate-900/10"
+          >
+            <div>
+              <h3 className="landing-display text-xl text-slate-950">Alterações não salvas</h3>
+              <p className="text-xs text-slate-600 mt-1.5 leading-relaxed">
+                Você modificou as configurações da sala, mas ainda não salvou. Deseja salvar antes de fechar?
+              </p>
+            </div>
+            <div className="flex flex-wrap items-center justify-end gap-2 pt-1">
+              <button
+                type="button"
+                onClick={() => setShowUnsavedPrompt(false)}
+                className="h-10 px-4 rounded-full text-xs font-bold text-slate-700 hover:bg-slate-900/10"
+              >
+                Voltar
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowUnsavedPrompt(false);
+                  closeRoomSettings();
+                }}
+                className="h-10 px-4 rounded-full bg-rose-600/15 hover:bg-rose-600/25 text-rose-700 text-xs font-bold"
+              >
+                Sair sem salvar
+              </button>
+              <button
+                type="button"
+                disabled={saving}
+                onClick={(e) => {
+                  setShowUnsavedPrompt(false);
+                  void handleSave(e as unknown as React.FormEvent);
+                }}
+                className="h-10 px-5 rounded-full bg-[#0b0f19] hover:bg-slate-800 disabled:opacity-50 text-white text-xs font-extrabold"
+              >
+                {saving ? 'Salvando...' : 'Salvar e sair'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </ModalShell>
   );
 }

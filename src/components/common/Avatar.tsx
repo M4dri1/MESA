@@ -1,6 +1,7 @@
 'use client';
 
 import React from 'react';
+import { mediaTransformStyle } from '@/utils/mediaTransform';
 
 interface AvatarProps {
   letter: string;
@@ -34,9 +35,11 @@ export function Avatar({
       style={{ backgroundColor: avatarUrl ? 'transparent' : color }}
     >
       {avatarUrl ? (
+        // eslint-disable-next-line @next/next/no-img-element
         <img
           src={avatarUrl}
           alt={letter || 'Avatar'}
+          style={mediaTransformStyle(avatarUrl)}
           className="w-full h-full object-cover"
         />
       ) : (

@@ -4,6 +4,7 @@ import React from 'react';
 import { Room } from '@/types';
 import { Lock, Globe, Trash2, Settings } from 'lucide-react';
 import { Avatar } from '@/components/common/Avatar';
+import { mediaTransformStyle } from '@/utils/mediaTransform';
 import { useMesa } from '@/context/MesaContext';
 
 interface RoomCardProps {
@@ -43,7 +44,7 @@ export function RoomCard({ room, onEnter }: RoomCardProps) {
       >
         {room.iconUrl && (
           // eslint-disable-next-line @next/next/no-img-element
-          <img src={room.iconUrl} alt="" className="absolute inset-0 w-full h-full object-cover pointer-events-none" />
+          <img src={room.iconUrl} alt="" style={mediaTransformStyle(room.iconUrl)} className="absolute inset-0 w-full h-full object-cover pointer-events-none" />
         )}
         {/* Escurece só embaixo, para o nome ler bem em cima de qualquer cor ou foto */}
         <div className="absolute inset-0 pointer-events-none bg-gradient-to-t from-black/65 via-black/5 to-transparent" />

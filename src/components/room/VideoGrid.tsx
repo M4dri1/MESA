@@ -6,6 +6,7 @@ import { Mic, MicOff, VideoOff, Clock, Music2, Monitor, MoreHorizontal } from 'l
 import { Equalizer } from './MusicPanel';
 import { RoleBadge } from '@/components/modals/ParticipantModal';
 import { StreamVideo } from '@/components/common/StreamVideo';
+import { mediaTransformStyle } from '@/utils/mediaTransform';
 
 /**
  * Quadradinhos de quem está na chamada.
@@ -125,7 +126,7 @@ export function VideoGrid({ strip = false }: { strip?: boolean }) {
             ) : member.avatarUrl ? (
               <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-full overflow-hidden ring-2 ring-white/20 ">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={member.avatarUrl} alt={member.name} className="w-full h-full object-cover" />
+                <img src={member.avatarUrl} alt={member.name} style={mediaTransformStyle(member.avatarUrl)} className="w-full h-full object-cover" />
               </div>
             ) : (
               <div
@@ -225,7 +226,7 @@ export function VideoGrid({ strip = false }: { strip?: boolean }) {
           ) : currentUser.avatarUrl ? (
             <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-full overflow-hidden ring-2 ring-white/20 ">
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={currentUser.avatarUrl} alt={currentUser.name} className="w-full h-full object-cover" />
+              <img src={currentUser.avatarUrl} alt={currentUser.name} style={mediaTransformStyle(currentUser.avatarUrl)} className="w-full h-full object-cover" />
             </div>
           ) : (
             <div

@@ -5,6 +5,7 @@ import { useMesa } from '@/context/MesaContext';
 import { Volume2, VolumeX, LogOut, UserPlus, SlidersHorizontal, ChevronDown } from 'lucide-react';
 import { PRESENCE_OPTIONS } from '@/components/common/PresenceSettings';
 import { Avatar } from '@/components/common/Avatar';
+import { mediaTransformStyle } from '@/utils/mediaTransform';
 
 export function TopNavigation() {
   const {
@@ -87,10 +88,15 @@ export function TopNavigation() {
                 className="mesa-paper absolute right-0 top-12 w-60 bg-[#f6f5f0] text-slate-900 rounded-2xl overflow-hidden z-50 animate-fadeIn shadow-[0_24px_48px_-12px_rgba(11,15,25,0.55)]"
               >
                 {currentUser.bannerUrl && (
-                  <div
-                    className="h-14 w-full bg-cover bg-center"
-                    style={{ backgroundImage: `url(${currentUser.bannerUrl})` }}
-                  />
+                  <div className="relative h-14 w-full overflow-hidden">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={currentUser.bannerUrl}
+                      alt=""
+                      style={mediaTransformStyle(currentUser.bannerUrl)}
+                      className="w-full h-full object-cover"
+                    />
+                  </div>
                 )}
                 <div className="p-2">
                 <div className="px-3 py-2.5 border-b border-slate-900/10 mb-1.5">

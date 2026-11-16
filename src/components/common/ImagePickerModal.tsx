@@ -3,6 +3,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { useMesa } from '@/context/MesaContext';
 import { GifResult } from '@/types';
+import { parseMediaPos, formatMediaPos } from '@/utils/mediaTransform';
 import { Upload, Sparkles, Search, ZoomIn, ZoomOut, RotateCcw, Check, X, Move } from 'lucide-react';
 
 export type PickerShape = 'avatar' | 'banner' | 'room';
@@ -24,16 +25,17 @@ const DIMENSIONS: Record<PickerShape, { w: number; h: number; previewClass: stri
 
 /**
  * Janela para escolher Foto ou GIF (do computador ou pesquisando GIFs igual no chat)
- * e posicionar/dar zoom na imagem antes de salvar.
+ * e posicionar/dar zoom na imagem ou GIF antes de aplicar.
  */
 export function ImagePickerModal({ open, shape, title, initialUrl, onClose, onSelect }: ImagePickerModalProps) {
   const { searchGifs } = useMesa();
 
   const [tab, setTab] = useState<'upload' | 'gif'>('upload');
-  const [rawUrl, setRawUrl] = useState<string>(initialUrl && initialUrl.startsWith('data:image/') ? initialUrl : '');
-  const [naturalSize, setNaturalSize] = useState<{ w: number; h: number }>({ w: 1, h: 1 });
+  const [rawUrl, setRawUrl] = useState<string>('');
+  const [naturalSize, setNaturalSize] = useState<{ w: number; h: number }>({ w: 240, h: 240 });
   const [zoom, setZoom] = useState(1);
-  const [offset, setOffset] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
+  // offset em % da caixa de pré-visualização (-100 a 100)
+  const [pctOffset, setPctOffset] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
   const [error, setError] = useState<string | null>(null);
 
   const [gifQuery, setGifQuery] = useState('');
@@ -47,10 +49,11 @@ export function ImagePickerModal({ open, shape, title, initialUrl, onClose, onSe
 
   useEffect(() => {
     if (!open) return;
+    const parsed = parseMediaPos(initialUrl);
     setTab('upload');
-    setRawUrl(initialUrl && initialUrl.startsWith('data:image/') ? initialUrl : '');
-    setZoom(1);
-    setOffset({ x: 0, y: 0 });
+    setRawUrl(parsed.baseUrl);
+    setZoom(parsed.zoom);
+    setPctOffset({ x: parsed.tx, y: parsed.ty });
     setError(null);
     setGifQuery('');
   }, [open, initialUrl]);
@@ -95,40 +98,42 @@ export function ImagePickerModal({ open, shape, title, initialUrl, onClose, onSe
       const url = String(reader.result || '');
       setRawUrl(url);
       setZoom(1);
-      setOffset({ x: 0, y: 0 });
+      setPctOffset({ x: 0, y: 0 });
     };
     reader.readAsDataURL(file);
   };
 
-  const clampOffset = (nx: number, ny: number, z = zoom) => {
+  const clampPct = (tx: number, ty: number, z = zoom) => {
     const box = previewRef.current;
-    const bw = box ? box.clientWidth : 240;
-    const bh = box ? box.clientHeight : 240;
-    const baseScale = Math.max(bw / naturalSize.w, bh / naturalSize.h);
+    const bw = box ? box.clientWidth : dim.w;
+    const bh = box ? box.clientHeight : dim.h;
+    const baseScale = Math.max(bw / Math.max(1, naturalSize.w), bh / Math.max(1, naturalSize.h));
     const dispW = naturalSize.w * baseScale * z;
     const dispH = naturalSize.h * baseScale * z;
-    const maxX = Math.max(0, (dispW - bw) / 2);
-    const maxY = Math.max(0, (dispH - bh) / 2);
+    const maxPctX = Math.max(50, ((dispW - bw) / 2 / bw) * 100 + 35);
+    const maxPctY = Math.max(50, ((dispH - bh) / 2 / bh) * 100 + 35);
     return {
-      x: Math.max(-maxX, Math.min(maxX, nx)),
-      y: Math.max(-maxY, Math.min(maxY, ny)),
+      x: Math.max(-maxPctX, Math.min(maxPctX, tx)),
+      y: Math.max(-maxPctY, Math.min(maxPctY, ty)),
     };
   };
 
   const handleZoomChange = (nextZoom: number) => {
     const z = Math.max(1, Math.min(3, Math.round(nextZoom * 100) / 100));
     setZoom(z);
-    setOffset((prev) => clampOffset(prev.x, prev.y, z));
+    setPctOffset((prev) => clampPct(prev.x, prev.y, z));
   };
 
-  const handleApplyUpload = () => {
+  const handleApply = () => {
     if (!rawUrl) return;
-    // Se for um GIF animado sem recorte/zoom e leve, mantém o GIF animado original
-    if (rawUrl.startsWith('data:image/gif') && zoom === 1 && offset.x === 0 && offset.y === 0 && rawUrl.length <= 380000) {
-      onSelect(rawUrl);
+    const isAnimatedGif = rawUrl.startsWith('https://') || rawUrl.startsWith('data:image/gif');
+    if (isAnimatedGif) {
+      // Mantém o GIF 100% animado e salva o posicionamento/zoom (#pos=x,y,zoom)
+      onSelect(formatMediaPos(rawUrl, pctOffset.x, pctOffset.y, zoom));
       onClose();
       return;
     }
+
     const img = new Image();
     img.onload = () => {
       const canvas = document.createElement('canvas');
@@ -137,17 +142,11 @@ export function ImagePickerModal({ open, shape, title, initialUrl, onClose, onSe
       const ctx = canvas.getContext('2d');
       if (!ctx) return;
 
-      const box = previewRef.current;
-      const bw = box ? box.clientWidth : dim.w;
-      const bh = box ? box.clientHeight : dim.h;
-      const ratioX = dim.w / bw;
-      const ratioY = dim.h / bh;
-
       const baseScale = Math.max(dim.w / img.width, dim.h / img.height);
       const drawW = img.width * baseScale * zoom;
       const drawH = img.height * baseScale * zoom;
-      const dx = (dim.w - drawW) / 2 + offset.x * ratioX;
-      const dy = (dim.h - drawH) / 2 + offset.y * ratioY;
+      const dx = (dim.w - drawW) / 2 + (pctOffset.x / 100) * dim.w;
+      const dy = (dim.h - drawH) / 2 + (pctOffset.y / 100) * dim.h;
 
       ctx.fillStyle = '#0b0f19';
       ctx.fillRect(0, 0, dim.w, dim.h);
@@ -158,13 +157,6 @@ export function ImagePickerModal({ open, shape, title, initialUrl, onClose, onSe
     };
     img.src = rawUrl;
   };
-
-  const box = previewRef.current;
-  const bw = box ? box.clientWidth : 240;
-  const bh = box ? box.clientHeight : 240;
-  const baseScale = Math.max(bw / Math.max(1, naturalSize.w), bh / Math.max(1, naturalSize.h));
-  const dispW = naturalSize.w * baseScale * zoom;
-  const dispH = naturalSize.h * baseScale * zoom;
 
   return (
     <div
@@ -189,7 +181,7 @@ export function ImagePickerModal({ open, shape, title, initialUrl, onClose, onSe
           </button>
         </div>
 
-        {/* Abas: Enviar foto/GIF vs Buscar GIF */}
+        {/* Abas: Enviar/Posicionar vs Buscar GIF */}
         <div className="px-5 pt-3 flex items-center gap-2">
           <button
             type="button"
@@ -226,15 +218,26 @@ export function ImagePickerModal({ open, shape, title, initialUrl, onClose, onSe
               />
 
               {!rawUrl ? (
-                <button
-                  type="button"
-                  onClick={() => fileInputRef.current?.click()}
-                  className="w-full py-10 px-4 rounded-2xl border-2 border-dashed border-slate-900/20 hover:border-[#3044f0] bg-white flex flex-col items-center justify-center gap-2 text-center transition-colors"
-                >
-                  <Upload className="w-8 h-8 text-[#3044f0]" />
-                  <span className="text-sm font-extrabold text-slate-900">Escolher foto ou GIF do computador</span>
-                  <span className="text-xs text-slate-500">Depois de escolher, arraste para posicionar como quiser</span>
-                </button>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <button
+                    type="button"
+                    onClick={() => fileInputRef.current?.click()}
+                    className="py-9 px-4 rounded-2xl border-2 border-dashed border-slate-900/20 hover:border-[#3044f0] bg-white flex flex-col items-center justify-center gap-2 text-center transition-colors"
+                  >
+                    <Upload className="w-7 h-7 text-[#3044f0]" />
+                    <span className="text-xs font-extrabold text-slate-900">Do computador</span>
+                    <span className="text-[11px] text-slate-500">Foto ou GIF do seu PC</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setTab('gif')}
+                    className="py-9 px-4 rounded-2xl border-2 border-dashed border-slate-900/20 hover:border-[#3044f0] bg-white flex flex-col items-center justify-center gap-2 text-center transition-colors"
+                  >
+                    <Sparkles className="w-7 h-7 text-[#3044f0]" />
+                    <span className="text-xs font-extrabold text-slate-900">Pesquisar GIF</span>
+                    <span className="text-[11px] text-slate-500">Escolha e posicione um GIF</span>
+                  </button>
+                </div>
               ) : (
                 <div className="space-y-3">
                   <div className="flex flex-col items-center">
@@ -250,14 +253,19 @@ export function ImagePickerModal({ open, shape, title, initialUrl, onClose, onSe
                           active: true,
                           startX: e.clientX,
                           startY: e.clientY,
-                          origX: offset.x,
-                          origY: offset.y,
+                          origX: pctOffset.x,
+                          origY: pctOffset.y,
                         };
                       }}
                       onPointerMove={(e) => {
                         const d = dragRef.current;
                         if (!d || !d.active) return;
-                        setOffset(clampOffset(d.origX + (e.clientX - d.startX), d.origY + (e.clientY - d.startY)));
+                        const box = previewRef.current;
+                        const bw = box ? box.clientWidth : dim.w;
+                        const bh = box ? box.clientHeight : dim.h;
+                        const dxPct = ((e.clientX - d.startX) / bw) * 100;
+                        const dyPct = ((e.clientY - d.startY) / bh) * 100;
+                        setPctOffset(clampPct(d.origX + dxPct, d.origY + dyPct));
                       }}
                       onPointerUp={() => {
                         if (dragRef.current) dragRef.current.active = false;
@@ -274,12 +282,10 @@ export function ImagePickerModal({ open, shape, title, initialUrl, onClose, onSe
                           setNaturalSize({ w: el.naturalWidth || 240, h: el.naturalHeight || 240 });
                         }}
                         style={{
-                          width: `${dispW}px`,
-                          height: `${dispH}px`,
-                          maxWidth: 'none',
-                          transform: `translate(${offset.x}px, ${offset.y}px)`,
+                          transform: `translate(${pctOffset.x}%, ${pctOffset.y}%) scale(${zoom})`,
+                          transformOrigin: 'center center',
                         }}
-                        className="pointer-events-none select-none object-cover"
+                        className="w-full h-full object-cover pointer-events-none select-none"
                       />
                       <span className="absolute bottom-2 left-1/2 -translate-x-1/2 px-2.5 py-0.5 rounded-full bg-black/65 text-white text-[10px] font-bold flex items-center gap-1 pointer-events-none whitespace-nowrap">
                         <Move className="w-3 h-3" /> Arraste para posicionar
@@ -304,7 +310,7 @@ export function ImagePickerModal({ open, shape, title, initialUrl, onClose, onSe
                       type="button"
                       onClick={() => {
                         setZoom(1);
-                        setOffset({ x: 0, y: 0 });
+                        setPctOffset({ x: 0, y: 0 });
                       }}
                       title="Centralizar imagem"
                       className="p-1.5 rounded-lg bg-slate-900/5 hover:bg-slate-900/10 text-slate-700 text-xs font-bold flex items-center gap-1"
@@ -313,14 +319,23 @@ export function ImagePickerModal({ open, shape, title, initialUrl, onClose, onSe
                     </button>
                   </div>
 
-                  <div className="flex items-center justify-between">
-                    <button
-                      type="button"
-                      onClick={() => fileInputRef.current?.click()}
-                      className="text-xs font-bold text-[#3044f0] hover:underline"
-                    >
-                      Escolher outra imagem do computador
-                    </button>
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-3">
+                      <button
+                        type="button"
+                        onClick={() => fileInputRef.current?.click()}
+                        className="text-xs font-bold text-[#3044f0] hover:underline"
+                      >
+                        Trocar foto do PC
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setTab('gif')}
+                        className="text-xs font-bold text-[#3044f0] hover:underline"
+                      >
+                        Trocar por GIF
+                      </button>
+                    </div>
                     <span className="text-[11px] font-mono text-slate-500">{Math.round(zoom * 100)}%</span>
                   </div>
                 </div>
@@ -339,7 +354,7 @@ export function ImagePickerModal({ open, shape, title, initialUrl, onClose, onSe
                 <button
                   type="button"
                   disabled={!rawUrl}
-                  onClick={handleApplyUpload}
+                  onClick={handleApply}
                   className="h-10 px-5 rounded-full bg-[#0b0f19] hover:bg-slate-800 disabled:opacity-40 text-white text-xs font-extrabold flex items-center gap-1.5"
                 >
                   <Check className="w-3.5 h-3.5" />
@@ -348,7 +363,7 @@ export function ImagePickerModal({ open, shape, title, initialUrl, onClose, onSe
               </div>
             </>
           ) : (
-            /* ABA 2: BUSCAR GIF */
+            /* ABA 2: BUSCAR GIF -> ao clicar num GIF, vai para a aba de posicionar! */
             <div className="space-y-3">
               <div className="relative">
                 <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-2.5" />
@@ -375,10 +390,12 @@ export function ImagePickerModal({ open, shape, title, initialUrl, onClose, onSe
                       key={gif.id}
                       type="button"
                       onClick={() => {
-                        onSelect(gif.url);
-                        onClose();
+                        setRawUrl(gif.url);
+                        setZoom(1);
+                        setPctOffset({ x: 0, y: 0 });
+                        setTab('upload');
                       }}
-                      title={gif.title || 'Escolher este GIF'}
+                      title={gif.title || 'Escolher e posicionar este GIF'}
                       className="group relative aspect-video rounded-xl overflow-hidden bg-black/20 border border-slate-900/10 hover:ring-2 hover:ring-[#3044f0]"
                     >
                       {/* eslint-disable-next-line @next/next/no-img-element */}

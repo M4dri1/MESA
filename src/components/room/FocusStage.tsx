@@ -5,6 +5,7 @@ import { useMesa, isActiveUntil } from '@/context/MesaContext';
 import { Mic, MicOff, Monitor, Video, X, Maximize2, Minimize2, ZoomIn, ZoomOut } from 'lucide-react';
 import { StreamVideo } from '@/components/common/StreamVideo';
 import { RoleBadge } from '@/components/modals/ParticipantModal';
+import { mediaTransformStyle } from '@/utils/mediaTransform';
 
 /**
  * Palco de foco (estilo Discord): a câmera ou a tela de UMA pessoa em tamanho grande, sem abrir tela cheia.
@@ -167,7 +168,7 @@ export function FocusStage() {
           {avatarUrl ? (
             <div className="w-28 h-28 sm:w-36 sm:h-36 rounded-full overflow-hidden ring-4 ring-white/15">
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={avatarUrl} alt={name} className="w-full h-full object-cover" />
+              <img src={avatarUrl} alt={name} style={mediaTransformStyle(avatarUrl)} className="w-full h-full object-cover" />
             </div>
           ) : (
             <div
