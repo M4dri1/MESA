@@ -344,7 +344,7 @@ const POS_HASH_RE = /(?:#pos=-?\d+(?:\.\d+)?,-?\d+(?:\.\d+)?,\d+(?:\.\d+)?)?$/;
 
 function isAllowedMediaUrl(url) {
   if (typeof url !== 'string' || url.length > 560) return false;
-  return /^https:\/\/([a-z0-9-]+\.)*(giphy\.com|tenor\.com|klipy\.co|imgur\.com)\/[^\s"'<>]+$/i.test(url);
+  return /^https:\/\/([a-z0-9-]+\.)*(giphy\.com|tenor\.com|klipy\.com|klipy\.co|imgur\.com)\/[^\s"'<>]+$/i.test(url);
 }
 
 // Foto da sala: imagem pequena (o navegador reduz antes de mandar) ou GIF da busca
@@ -992,7 +992,7 @@ function setSecurityHeaders(req, res) {
   }
   res.setHeader(
     'Content-Security-Policy',
-    "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://www.youtube.com https://s.ytimg.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' data: https://fonts.gstatic.com; img-src 'self' data: blob: https://i.ytimg.com https://*.giphy.com https://media.tenor.com https://c.tenor.com https://i.imgur.com; media-src 'self' data: blob:; connect-src 'self' ws: wss: https://*.giphy.com; frame-src 'self' https://www.youtube.com https://www.youtube-nocookie.com; worker-src 'self' blob:; object-src 'none'; base-uri 'self'; frame-ancestors 'self'"
+    "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://www.youtube.com https://s.ytimg.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' data: https://fonts.gstatic.com; img-src 'self' data: blob: https://i.ytimg.com https://*.giphy.com https://static.klipy.com https://media.tenor.com https://c.tenor.com https://i.imgur.com; media-src 'self' data: blob:; connect-src 'self' ws: wss: https://*.giphy.com; frame-src 'self' https://www.youtube.com https://www.youtube-nocookie.com; worker-src 'self' blob:; object-src 'none'; base-uri 'self'; frame-ancestors 'self'"
   );
 }
 
@@ -1051,7 +1051,8 @@ const NOISE_FILES = {
   'rnnoise_simd.wasm': { file: path.join(NOISE_DIR, 'rnnoise_simd.wasm'), type: 'application/wasm' },
 };
 
-// Busca de GIFs: precisa de uma chave gratuita do Giphy em giphy.config.json ({ "key": "..." })
+// Busca de GIFs: usa o Klipy (klipy.config.json ou KLIPY_KEY) e/ou o Giphy (giphy.config.json ou GIPHY_KEY).
+// Com os dois configurados, o Klipy vai primeiro e o Giphy entra de reserva se ele falhar.
 let giphyKey = process.env.GIPHY_KEY || '';
 try {
   const giphyPath = path.join(__dirname, 'giphy.config.json');
@@ -1059,8 +1060,17 @@ try {
 } catch (err) {
   console.error('giphy.config.json inválido:', err.message);
 }
-const gifCache = new Map(); // consulta -> { at, gifs }
+let klipyKey = process.env.KLIPY_KEY || '';
+try {
+  const klipyPath = path.join(__dirname, 'klipy.config.json');
+  if (!klipyKey && fs.existsSync(klipyPath)) klipyKey = String(JSON.parse(fs.readFileSync(klipyPath, 'utf8')).key || '').trim();
+} catch (err) {
+  console.error('klipy.config.json inválido:', err.message);
+}
+const gifCache = new Map(); // provedor + consulta -> { at, gifs }
 const isGiphyMedia = (value) => /^https:\/\/(media\d*|i)\.giphy\.com\/[\w\-./?=&%]+$/i.test(String(value || ''));
+const isKlipyMedia = (value) => /^https:\/\/static\.klipy\.com\/[\w\-./?=&%]+$/i.test(String(value || ''));
+const isGifMedia = (value) => isGiphyMedia(value) || isKlipyMedia(value);
 
 /* ------------------------------------------------------------------ */
 /* Soundpad: sons curtos de cada pessoa, tocados para a chamada toda   */
@@ -1705,26 +1715,49 @@ async function handleApi(req, res, url) {
     }
   }
 
-  /* ----- Busca de GIFs (Giphy) ----- */
+  /* ----- Busca de GIFs (Klipy primeiro, Giphy de reserva) ----- */
   if (route === 'GET /api/gifs') {
     const user = userFromToken(bearer(req));
     if (!user) return json(res, 401, { error: 'Sessão expirada.' });
-    if (!giphyKey) {
+    if (!klipyKey && !giphyKey) {
       return json(res, 503, { needsKey: true, error: 'A busca de GIFs ainda não foi ligada neste servidor.' });
     }
     const query = String(url.searchParams.get('q') || '').trim().slice(0, 60);
     const cacheKey = query.toLowerCase();
     const cached = gifCache.get(cacheKey);
-    if (cached && Date.now() - cached.at < 5 * 60 * 1000) return json(res, 200, { gifs: cached.gifs });
+    if (cached && Date.now() - cached.at < 5 * 60 * 1000) return json(res, 200, { gifs: cached.gifs, provider: cached.provider });
 
-    const endpoint = query
-      ? `https://api.giphy.com/v1/gifs/search?api_key=${giphyKey}&q=${encodeURIComponent(query)}&limit=24&rating=pg-13&lang=pt`
-      : `https://api.giphy.com/v1/gifs/trending?api_key=${giphyKey}&limit=24&rating=pg-13`;
-    try {
+    const fromKlipy = async () => {
+      const base = `https://api.klipy.com/api/v1/${encodeURIComponent(klipyKey)}/gifs`;
+      const customer = encodeURIComponent(`mesa-${user.id}`);
+      const endpoint = query
+        ? `${base}/search?q=${encodeURIComponent(query)}&per_page=24&customer_id=${customer}`
+        : `${base}/trending?per_page=24&customer_id=${customer}`;
+      const response = await fetch(endpoint, { signal: AbortSignal.timeout(8000) });
+      if (!response.ok) throw new Error(`Klipy respondeu ${response.status}`);
+      const payload = await response.json();
+      if (payload.result === false) throw new Error('Klipy recusou o pedido');
+      const items = (payload.data && payload.data.data) || [];
+      return items
+        .map((item) => {
+          const file = item.file || {};
+          const small = file.xs || file.sm || {};
+          const medium = file.md || file.sm || file.hd || {};
+          const preview = (small.webp || small.gif || medium.gif || {}).url;
+          const full = (medium.gif || (file.hd && file.hd.gif) || {}).url;
+          return { id: `k${item.id}`, title: String(item.title || 'GIF').slice(0, 80), preview, url: full };
+        })
+        .filter((gif) => isKlipyMedia(gif.preview) && isKlipyMedia(gif.url));
+    };
+
+    const fromGiphy = async () => {
+      const endpoint = query
+        ? `https://api.giphy.com/v1/gifs/search?api_key=${giphyKey}&q=${encodeURIComponent(query)}&limit=24&rating=pg-13&lang=pt`
+        : `https://api.giphy.com/v1/gifs/trending?api_key=${giphyKey}&limit=24&rating=pg-13`;
       const response = await fetch(endpoint, { signal: AbortSignal.timeout(8000) });
       if (!response.ok) throw new Error(`Giphy respondeu ${response.status}`);
       const payload = await response.json();
-      const gifs = (payload.data || [])
+      return (payload.data || [])
         .map((item) => {
           const images = item.images || {};
           const preview = (images.fixed_width_small || images.fixed_width || {}).url;
@@ -1732,13 +1765,24 @@ async function handleApi(req, res, url) {
           return { id: String(item.id), title: String(item.title || 'GIF').slice(0, 80), preview, url: full };
         })
         .filter((gif) => isGiphyMedia(gif.preview) && isGiphyMedia(gif.url));
-      gifCache.set(cacheKey, { at: Date.now(), gifs });
-      if (gifCache.size > 200) gifCache.delete(gifCache.keys().next().value);
-      return json(res, 200, { gifs });
-    } catch (err) {
-      console.error('Falha na busca de GIFs:', err.message);
-      return json(res, 502, { error: 'Não foi possível buscar GIFs agora. Tente de novo em instantes.' });
+    };
+
+    const providers = [];
+    if (klipyKey) providers.push(['klipy', fromKlipy]);
+    if (giphyKey) providers.push(['giphy', fromGiphy]);
+    for (const [name, run] of providers) {
+      try {
+        const gifs = await run();
+        // Klipy sem resultado para essa busca: tenta o Giphy antes de dizer que não achou
+        if (!gifs.length && name === 'klipy' && giphyKey) continue;
+        gifCache.set(cacheKey, { at: Date.now(), gifs, provider: name });
+        if (gifCache.size > 200) gifCache.delete(gifCache.keys().next().value);
+        return json(res, 200, { gifs, provider: name });
+      } catch (err) {
+        console.error(`Falha na busca de GIFs (${name}):`, err.message);
+      }
     }
+    return json(res, 502, { error: 'Não foi possível buscar GIFs agora. Tente de novo em instantes.' });
   }
 
   return json(res, 404, { error: 'Rota não encontrada.' });
@@ -2368,7 +2412,7 @@ function handleSocketMessage(ws, msg) {
     }
 
     case 'chat:gif': {
-      if (!isGiphyMedia(msg.url)) return;
+      if (!isGifMedia(msg.url)) return;
       addMessage(roomId, user.id, '', { id: newId('gif'), name: 'GIF', type: 'image', size: '', url: String(msg.url) });
       return;
     }
@@ -2662,7 +2706,7 @@ app.prepare().then(() => {
         ? `Confirmação de e-mail no cadastro: ATIVA (${mailer.kind})`
         : 'Confirmação de e-mail no cadastro: DESATIVADA (crie email.config.json para ativar)'
     );
-    console.log(giphyKey ? 'Busca de GIFs: ATIVA' : 'Busca de GIFs: DESATIVADA (crie giphy.config.json para ativar)');
+    console.log(klipyKey || giphyKey ? `Busca de GIFs: ATIVA (${[klipyKey && 'Klipy', giphyKey && 'Giphy'].filter(Boolean).join(' + ')})` : 'Busca de GIFs: DESATIVADA (crie klipy.config.json ou giphy.config.json para ativar)');
     console.log(youtubeKey ? 'Busca de músicas: ATIVA' : 'Busca de músicas: DESATIVADA (crie youtube.config.json para ativar; colar link funciona sem isso)');
   });
 });

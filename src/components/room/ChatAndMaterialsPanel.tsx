@@ -46,7 +46,7 @@ import { LANGUAGES, usePrefs } from '@/lib/preferences';
 import { SearchBar } from './SearchBar';
 
 // Endereços que servem a imagem direto (sem ser a página do site)
-const IMAGE_HOSTS = ['media.tenor.com', 'c.tenor.com', 'i.giphy.com', 'i.imgur.com'];
+const IMAGE_HOSTS = ['media.tenor.com', 'c.tenor.com', 'i.giphy.com', 'i.imgur.com', 'static.klipy.com'];
 
 /** Acha no texto um link que aponta direto para uma imagem ou GIF. */
 const formatSeconds = (total: number) => `${Math.floor(total / 60)}:${String(Math.floor(total % 60)).padStart(2, '0')}`;

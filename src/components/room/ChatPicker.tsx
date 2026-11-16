@@ -141,7 +141,7 @@ export function ChatPicker({ onEmoji, onClose }: { onEmoji: (emoji: string) => v
               <div data-testid="gif-needs-key" className="h-full flex flex-col items-center justify-center text-center px-4 gap-1.5">
                 <p className="text-xs font-bold text-slate-900">A busca de GIFs ainda não foi ligada</p>
                 <p className="text-[11px] text-slate-500 leading-relaxed">
-                  Quem cuida do servidor precisa colocar a chave gratuita do Giphy. Enquanto isso, dá para mandar GIF pelo
+                  Quem cuida do servidor precisa colocar a chave gratuita do Klipy ou do Giphy. Enquanto isso, dá para mandar GIF pelo
                   clipe (Foto ou GIF) ou colando o link direto do GIF no chat.
                 </p>
               </div>
@@ -171,7 +171,7 @@ export function ChatPicker({ onEmoji, onClose }: { onEmoji: (emoji: string) => v
               </div>
             )}
           </div>
-          <p className="px-2 py-1 text-[10px] text-slate-500 text-right border-t border-slate-900/10 flex-shrink-0">Powered by GIPHY</p>
+          <p className="px-2 py-1 text-[10px] text-slate-500 text-right border-t border-slate-900/10 flex-shrink-0">GIFs via Klipy / GIPHY</p>
         </div>
       )}
 
