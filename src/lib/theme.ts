@@ -133,15 +133,16 @@ function buildParams(theme: ThemeSettings): Params {
 function transformRgb(r: number, g: number, b: number, p: Params, isTextProperty = false): [number, number, number] {
   const [h, s, l] = rgbToHsl(r, g, b);
   const bluish = h >= 195 && h <= 262;
-  // Nunca escurece cor de texto (color) com a cor de fundo, senão textos escuros (slate-800/900) ficam invisíveis no modo escuro
-  if (!isTextProperty && p.bg && bluish && s <= 0.55 && l <= 0.45) {
+  // Fundo: só altera superfícies escuras do palco/barras (nunca textos)
+  if (!isTextProperty && p.bg && bluish && s <= 0.55 && l <= 0.35) {
     return hslToRgb(p.bg.hue, clamp(s * p.bg.satScale, 0, 1), clamp(l * p.bg.lightScale, 0, 0.6));
   }
   if (p.accent) {
-    if (bluish && s > 0.4) {
+    // Só altera o azul vivo da marca (#3044f0 / #2563eb), nunca tons escuros de texto ou fundo (l < 0.35)
+    if (bluish && s > 0.65 && l >= 0.35 && l <= 0.72) {
       return hslToRgb(p.accent.hue, clamp(s * (p.accent.sat / 0.83), 0, 1), clamp(l + (p.accent.light - 0.53) * 0.6, 0, 0.97));
     }
-    if (h >= 30 && h <= 60 && s > 0.6) {
+    if (h >= 30 && h <= 60 && s > 0.6 && l >= 0.38) {
       return hslToRgb(p.accent.hue, clamp(s * p.accent.sat, 0, 1), clamp(l + (p.accent.light - 0.58) * 0.6, 0, 0.97));
     }
   }
@@ -173,6 +174,10 @@ function ruleToOverride(rule: CSSRule, p: Params): string | null {
   // 1 = regra normal; 4 = @media; 12 = @supports
   if (rule.type === 1) {
     const styleRule = rule as CSSStyleRule;
+    // O painel de chat e as janelas (.mesa-paper) têm controle próprio e não devem ser alterados pela cor de Fundo
+    if (styleRule.selectorText && (styleRule.selectorText.includes('.mesa-paper') || styleRule.selectorText.includes('.mesa-chat-panel'))) {
+      return null;
+    }
     const declarations: string[] = [];
     for (let i = 0; i < styleRule.style.length; i++) {
       const property = styleRule.style[i];
@@ -213,54 +218,39 @@ function buildOverrideCss(p: Params): string {
     }
   }
 
-  // Moldura e grandes painéis estruturais (.bg-[#3044f0] que NÃO são botões) nunca devem virar a cor viva de destaque,
-  // senão os botões amarelos/destaque lá dentro somem por falta de contraste.
+  // Fundo (p.bg) altera SOMENTE o fundo do site, palco e moldura (NÃO altera o chat nem as janelas .mesa-paper)
   if (p.bg) {
     const [fr, fg, fb] = hslToRgb(p.bg.hue, clamp(0.55 * p.bg.satScale, 0, 0.8), clamp(0.065 * p.bg.lightScale, 0.012, 0.17));
     const [sr, sg, sb] = hslToRgb(p.bg.hue, clamp(0.62 * p.bg.satScale, 0, 0.85), clamp(0.15 * p.bg.lightScale, 0.04, 0.26));
-    const [pr, pg, pb] = hslToRgb(p.bg.hue, clamp(0.50 * p.bg.satScale, 0, 0.75), clamp(0.105 * p.bg.lightScale, 0.02, 0.20));
-    const [cr, cg, cb] = hslToRgb(p.bg.hue, clamp(0.46 * p.bg.satScale, 0, 0.75), clamp(0.16 * p.bg.lightScale, 0.04, 0.26));
-    const [lr, lg, lb] = hslToRgb(p.bg.hue, clamp(0.28 * p.bg.satScale, 0, 0.45), 0.92);
     css.push(`.mesa-frame,html[data-mesa-mode="dark"] .mesa-frame{background-color:rgb(${fr} ${fg} ${fb}) !important}`);
-    css.push(`:not(button).bg-\\[\\#3044f0\\]:not(.mesa-frame){background-color:rgb(${sr} ${sg} ${sb}) !important}`);
-    css.push(
-      `html:not([data-mesa-mode="dark"]) .mesa-paper.bg-\\[\\#f6f5f0\\],html:not([data-mesa-mode="dark"]) .mesa-paper .bg-\\[\\#f6f5f0\\]{background-color:rgb(${lr} ${lg} ${lb}) !important}`
-    );
-    css.push(
-      `html[data-mesa-mode="dark"] .mesa-paper.bg-\\[\\#f6f5f0\\],html[data-mesa-mode="dark"] .mesa-paper .bg-\\[\\#f6f5f0\\]{background-color:rgb(${pr} ${pg} ${pb}) !important}`
-    );
-    css.push(
-      `html[data-mesa-mode="dark"] .mesa-paper.bg-white,html[data-mesa-mode="dark"] .mesa-paper .bg-white{background-color:rgb(${cr} ${cg} ${cb}) !important}`
-    );
+    css.push(`:not(button)[class*="bg-[#3044f0]"]:not(.mesa-frame){background-color:rgb(${sr} ${sg} ${sb}) !important}`);
   } else if (p.accent) {
     const [fr, fg, fb] = hslToRgb(p.accent.hue, clamp(p.accent.sat * 0.65, 0, 0.75), 0.14);
     const [sr, sg, sb] = hslToRgb(p.accent.hue, clamp(p.accent.sat * 0.68, 0, 0.78), 0.20);
     css.push(`.mesa-frame{background-color:rgb(${fr} ${fg} ${fb}) !important}`);
-    css.push(`:not(button).bg-\\[\\#3044f0\\]:not(.mesa-frame){background-color:rgb(${sr} ${sg} ${sb}) !important}`);
+    css.push(`:not(button)[class*="bg-[#3044f0]"]:not(.mesa-frame){background-color:rgb(${sr} ${sg} ${sb}) !important}`);
   }
 
-  // Garante legibilidade total do texto nos cartões e no chat no modo escuro
-  css.push(
-    `html[data-mesa-mode="dark"] .mesa-paper .text-slate-950,html[data-mesa-mode="dark"] .mesa-paper .text-slate-900{color:#f8fafc !important}`,
-    `html[data-mesa-mode="dark"] .mesa-paper .text-slate-800,html[data-mesa-mode="dark"] .mesa-paper .text-slate-700{color:#e2e8f0 !important}`,
-    `html[data-mesa-mode="dark"] .mesa-paper .text-slate-600,html[data-mesa-mode="dark"] .mesa-paper .text-slate-500{color:#94a3b8 !important}`
-  );
-
-  // Cor exclusiva do painel de chat (com contraste automático de leitura para qualquer cor clara ou escura)
+  // Cor exclusiva do painel de chat: pinta todo o chat (topo, mensagens, cartões e barra de digitar) e ajusta todas as letras automaticamente
   if (p.chat) {
     const [br, bg, bb] = hslToRgb(p.chat.hue, p.chat.sat, p.chat.light);
-    const cardL = p.chat.isDark ? clamp(p.chat.light + 0.07, 0.08, 0.38) : clamp(p.chat.light + 0.06, 0.85, 0.99);
-    const [cr, cg, cb] = hslToRgb(p.chat.hue, clamp(p.chat.sat * 0.85, 0, 0.85), cardL);
-    const titleHex = p.chat.isDark ? '#f8fafc' : '#0f172a';
-    const bodyHex = p.chat.isDark ? '#e2e8f0' : '#1e293b';
+    const cardL = p.chat.isDark ? clamp(p.chat.light + 0.08, 0.11, 0.34) : clamp(p.chat.light + 0.07, 0.88, 1);
+    const [cr, cg, cb] = hslToRgb(p.chat.hue, clamp(p.chat.sat * 0.8, 0, 0.8), cardL);
+    const titleHex = p.chat.isDark ? '#ffffff' : '#0f172a';
+    const bodyHex = p.chat.isDark ? '#f1f5f9' : '#1e293b';
     const mutedHex = p.chat.isDark ? '#cbd5e1' : '#475569';
+    const borderRgba = p.chat.isDark ? 'rgba(255,255,255,0.14)' : 'rgba(15,23,42,0.12)';
+    const subtleBg = p.chat.isDark ? 'rgba(255,255,255,0.07)' : 'rgba(15,23,42,0.05)';
     css.push(
-      `.mesa-chat-panel,html[data-mesa-mode="dark"] .mesa-chat-panel,.mesa-chat-panel .bg-\\[\\#f6f5f0\\],html[data-mesa-mode="dark"] .mesa-chat-panel .bg-\\[\\#f6f5f0\\]{background-color:rgb(${br} ${bg} ${bb}) !important;color:${bodyHex} !important}`,
+      `.mesa-chat-panel,html[data-mesa-mode="dark"] .mesa-chat-panel,.mesa-chat-panel form,html[data-mesa-mode="dark"] .mesa-chat-panel form,.mesa-chat-panel [class*="bg-[#f6f5f0]"],html[data-mesa-mode="dark"] .mesa-chat-panel [class*="bg-[#f6f5f0]"]{background-color:rgb(${br} ${bg} ${bb}) !important;color:${bodyHex} !important}`,
       `.mesa-chat-panel .bg-white,html[data-mesa-mode="dark"] .mesa-chat-panel .bg-white{background-color:rgb(${cr} ${cg} ${cb}) !important;color:${titleHex} !important}`,
-      `.mesa-chat-panel .text-slate-950,.mesa-chat-panel .text-slate-900,html[data-mesa-mode="dark"] .mesa-chat-panel .text-slate-950,html[data-mesa-mode="dark"] .mesa-chat-panel .text-slate-900{color:${titleHex} !important}`,
-      `.mesa-chat-panel .text-slate-800,.mesa-chat-panel .text-slate-700,html[data-mesa-mode="dark"] .mesa-chat-panel .text-slate-800,html[data-mesa-mode="dark"] .mesa-chat-panel .text-slate-700{color:${bodyHex} !important}`,
-      `.mesa-chat-panel .text-slate-600,.mesa-chat-panel .text-slate-500,html[data-mesa-mode="dark"] .mesa-chat-panel .text-slate-600,html[data-mesa-mode="dark"] .mesa-chat-panel .text-slate-500{color:${mutedHex} !important}`,
-      `.mesa-chat-panel input,.mesa-chat-panel textarea{color:${titleHex} !important}`
+      `.mesa-chat-panel [class*="bg-slate-900/"]{background-color:${subtleBg} !important}`,
+      `.mesa-chat-panel [class*="border-slate-900/"]{border-color:${borderRgba} !important}`,
+      `.mesa-chat-panel [class*="text-slate-9"],html[data-mesa-mode="dark"] .mesa-chat-panel [class*="text-slate-9"]{color:${titleHex} !important}`,
+      `.mesa-chat-panel [class*="text-slate-8"],.mesa-chat-panel [class*="text-slate-7"],html[data-mesa-mode="dark"] .mesa-chat-panel [class*="text-slate-8"],html[data-mesa-mode="dark"] .mesa-chat-panel [class*="text-slate-7"]{color:${bodyHex} !important}`,
+      `.mesa-chat-panel [class*="text-slate-6"],.mesa-chat-panel [class*="text-slate-5"],.mesa-chat-panel [class*="text-slate-4"],html[data-mesa-mode="dark"] .mesa-chat-panel [class*="text-slate-6"],html[data-mesa-mode="dark"] .mesa-chat-panel [class*="text-slate-5"],html[data-mesa-mode="dark"] .mesa-chat-panel [class*="text-slate-4"]{color:${mutedHex} !important}`,
+      `.mesa-chat-panel p,.mesa-chat-panel span:not(.text-white):not([class*="text-rose-"]):not([class*="text-emerald-"]),.mesa-chat-panel input,.mesa-chat-panel textarea{color:${bodyHex} !important}`,
+      `.mesa-chat-panel input::placeholder,.mesa-chat-panel textarea::placeholder{color:${mutedHex} !important}`
     );
   }
 

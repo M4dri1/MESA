@@ -245,7 +245,7 @@ function RoomSettingsForm({ room }: { room: Room }) {
                       placeholder={
                         room.hasPassword && !passwordChanged
                           ? 'Digite nova senha para trocar (ou mantenha atual)'
-                          : 'Deixe vazio para entrar apenas com código/convite'
+                          : 'Deixe vazio para entrar apenas com convite ou link'
                       }
                       className={FIELD_INPUT}
                     />

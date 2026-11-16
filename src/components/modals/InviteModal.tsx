@@ -47,7 +47,7 @@ export function InviteModal() {
   const handleSendWhatsApp = () => {
     playSuccessSound();
     const text = encodeURIComponent(
-      `Oi! Estou estudando na sala "${currentRoom?.name || 'Mesa'}" no Mesa. Entra aí comigo: ${inviteLink} (Código: ${roomCode})`
+      `Oi! Estou estudando na sala "${currentRoom?.name || 'Mesa'}" no Mesa. Entra aí comigo: ${inviteLink}`
     );
     window.open(`https://api.whatsapp.com/send?text=${text}`, '_blank');
   };
@@ -61,7 +61,7 @@ export function InviteModal() {
   return (
     <ModalShell
       title="Convidar amigos"
-      subtitle="Quem tiver o link ou o código entra na sala depois de fazer login."
+      subtitle="Envie o link da sala ou convide seus colegas direto pela lista."
       onClose={() => setIsInviteModalOpen(false)}
       width="max-w-3xl"
     >
@@ -86,23 +86,6 @@ export function InviteModal() {
               </>
             )}
           </button>
-        </div>
-
-        {/* Código */}
-        <div className="text-center mb-6">
-          <span className="text-xs text-slate-500 block mb-2 font-semibold">ou digite o código na hora de entrar</span>
-          <div
-            onClick={handleCopyCode}
-            title="Clique para copiar o código"
-            className="py-3.5 px-7 rounded-2xl border-2 border-dashed border-slate-900/25 hover:border-[#3044f0] cursor-pointer inline-flex items-center justify-center gap-3 transition-colors group"
-          >
-            <span className="font-mono text-2xl font-black text-slate-950 tracking-wide">{displayCode}</span>
-            {copiedCode ? (
-              <Check className="w-4 h-4 text-emerald-600" />
-            ) : (
-              <Copy className="w-4 h-4 text-slate-400 group-hover:text-[#3044f0]" />
-            )}
-          </div>
         </div>
 
         {/* WhatsApp */}

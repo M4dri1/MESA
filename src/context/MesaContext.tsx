@@ -1225,7 +1225,7 @@ export function MesaProvider({ children }: { children: ReactNode }) {
           });
         }, 2500);
         if (padListen && !isDeafened) {
-          void playClip(res.joinSound.url, padVolume);
+          void playClip(res.joinSound.url, padVolume, 5);
         }
       }
       setStudyCenterMode('screen');
@@ -2050,7 +2050,7 @@ export function MesaProvider({ children }: { children: ReactNode }) {
         // Silenciando a chamada, ou os sons, ou aquela pessoa, o som não toca para mim
         if (isDeafened || !padListen) return;
         const personVolume = Math.min(1, peerVolumes[msg.userId] ?? 1);
-        void playClip(msg.url, personVolume * padVolume);
+        void playClip(msg.url, personVolume * padVolume, msg.maxDuration);
         return;
       }
       case 'music:state': {

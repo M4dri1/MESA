@@ -353,13 +353,8 @@ export function SidebarLeft() {
               </button>
             </div>
 
-            {/* Código e convite */}
+            {/* Convite */}
             <div className="space-y-2.5">
-              <div className="py-3 px-3 rounded-2xl border border-dashed border-white/20 text-center">
-                <span className="text-[10px] font-bold uppercase tracking-wide text-slate-400 block mb-1">Código da sala</span>
-                <span className="font-mono text-base font-bold text-amber-300">{currentRoom.code}</span>
-              </div>
-
               <button
                 onClick={() => setIsInviteModalOpen(true)}
                 className="w-full py-2.5 px-4 rounded-full bg-[#ffd027] hover:bg-[#ffdd55] text-slate-950 font-extrabold text-xs flex items-center justify-center gap-2 transition-colors"

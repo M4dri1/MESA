@@ -84,14 +84,9 @@ export function RoomCard({ room, onEnter }: RoomCardProps) {
         </h3>
       </div>
 
-      {/* Embaixo: código, quem está aí e o botão */}
+      {/* Embaixo: quem está aí e o botão */}
       <div className="flex-1 px-3 pt-3.5 pb-2.5 flex flex-col gap-3">
-        <p className="text-[11px] text-slate-500 flex items-center gap-2">
-          <span className="font-bold uppercase tracking-wide">Código:</span>
-          <span className="font-mono font-bold text-slate-900 tracking-wide text-xs">{room.code}</span>
-        </p>
-
-        <div className="flex items-center justify-between gap-3 pt-3 border-t border-slate-900/10">
+        <div className="flex items-center justify-between gap-3 pt-1">
           <div className="flex flex-col gap-1.5 min-w-0">
             <div className="flex items-center gap-1.5">
               <span className={`w-2 h-2 rounded-full flex-shrink-0 ${isOnline ? 'bg-emerald-500 animate-pulse' : 'bg-slate-300'}`} />

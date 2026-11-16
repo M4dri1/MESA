@@ -1947,7 +1947,7 @@ function handleSocketMessage(ws, msg) {
       if (!already && user.joinSoundId && !punishedUntil(room, user.id)) {
         const s = (db.sounds[user.id] || []).find((item) => item.id === user.joinSoundId);
         if (s && db.files[s.id]) {
-          joinSound = { userId: user.id, name: s.name, emoji: s.emoji || '🔊', url: soundUrl(s.id) };
+          joinSound = { userId: user.id, name: s.name, emoji: s.emoji || '🔊', url: soundUrl(s.id), maxDuration: 5 };
         }
       }
 

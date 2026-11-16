@@ -79,7 +79,7 @@ export function AppearancePanel() {
                   accent: preset.accent,
                   chat: theme.chat || null,
                   preset: preset.id,
-                  mode: preset.id === 'padrao' ? 'light' : 'dark',
+                  mode: theme.mode,
                 })
               }
               className={`p-2 rounded-xl border text-left transition-colors ${
@@ -110,7 +110,7 @@ export function AppearancePanel() {
             type="color"
             data-testid="theme-bg"
             value={theme.bg || FALLBACK_BG}
-            onChange={(e) => update({ ...theme, bg: e.target.value, preset: 'custom', mode: 'dark' })}
+            onChange={(e) => update({ ...theme, bg: e.target.value, preset: 'custom' })}
             className="w-full h-9 rounded-lg bg-transparent cursor-pointer"
           />
         </label>

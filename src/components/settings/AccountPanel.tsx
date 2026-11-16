@@ -63,6 +63,19 @@ export function AccountPanel({ onLogout }: { onLogout: () => void }) {
     if (!file) return;
     setUploadingSound(true);
     setError(null);
+    try {
+      const Ctx: typeof AudioContext | undefined = window.AudioContext || (window as any).webkitAudioContext;
+      if (Ctx) {
+        const tempCtx = new Ctx();
+        const decoded = await tempCtx.decodeAudioData(await file.arrayBuffer());
+        await tempCtx.close().catch(() => {});
+        if (decoded.duration > 5.2) {
+          setUploadingSound(false);
+          setError('O som de entrada na call pode ter no máximo 5 segundos.');
+          return;
+        }
+      }
+    } catch {}
     const baseName = file.name.replace(/\.[^.]+$/, '').slice(0, 24) || 'Entrada';
     const res = await addSound(file, { name: baseName, emoji: '🎺' });
     setUploadingSound(false);
@@ -77,7 +90,7 @@ export function AccountPanel({ onLogout }: { onLogout: () => void }) {
       return;
     }
     const found = sounds.find((s) => s.id === joinSoundId);
-    if (found) playClip(found.url, padVolume);
+    if (found) void playClip(found.url, padVolume, 5);
     else playJoinRoomSound();
   };
 
@@ -176,15 +189,15 @@ export function AccountPanel({ onLogout }: { onLogout: () => void }) {
           </div>
         </div>
 
-        {/* Som de entrada na call (customizável) */}
+        {/* Som de entrada na call (customizável, até 5s) */}
         <div className="p-3.5 rounded-2xl bg-[#f6f5f0] border border-slate-900/10 space-y-2">
           <div className="flex items-center justify-between gap-2">
             <div>
               <label htmlFor="profile-join-sound" className="text-xs font-bold text-slate-900 flex items-center gap-1.5">
-                <Music2 className="w-3.5 h-3.5 text-[#3044f0]" /> Som de entrada na call (opcional)
+                <Music2 className="w-3.5 h-3.5 text-[#3044f0]" /> Som de entrada na call (até 5 s)
               </label>
               <span className="text-[11px] text-slate-500 block">
-                Escolha um efeito do seu Soundpad para tocar para a sala quando você entrar na chamada.
+                Escolha um áudio curto (máx. 5 segundos) para tocar quando você entrar na chamada.
               </span>
             </div>
             <button
@@ -194,7 +207,7 @@ export function AccountPanel({ onLogout }: { onLogout: () => void }) {
               className="px-2.5 py-1.5 rounded-xl bg-white border border-slate-900/10 hover:border-[#3044f0] text-slate-900 text-[11px] font-bold flex items-center gap-1.5 flex-shrink-0"
             >
               <Upload className="w-3.5 h-3.5 text-[#3044f0]" />
-              <span>{uploadingSound ? 'Enviando...' : 'Enviar áudio'}</span>
+              <span>{uploadingSound ? 'Enviando...' : 'Enviar áudio (5 s)'}</span>
             </button>
             <input ref={soundInputRef} type="file" accept="audio/*" onChange={handleSoundUpload} className="hidden" />
           </div>

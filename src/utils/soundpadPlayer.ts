@@ -48,7 +48,7 @@ export function preloadClip(url: string) {
 }
 
 /** Toca o som com o volume dado (0 a 1). Devolve false se não tocou. */
-export async function playClip(url: string, volume: number): Promise<boolean> {
+export async function playClip(url: string, volume: number, maxSeconds?: number): Promise<boolean> {
   if (volume <= 0 || active >= MAX_ACTIVE) return false;
   const context = getContext();
   if (!context) return false;
@@ -67,7 +67,11 @@ export async function playClip(url: string, volume: number): Promise<boolean> {
       source.disconnect();
       gain.disconnect();
     };
-    source.start();
+    if (maxSeconds && maxSeconds > 0 && buffer.duration > maxSeconds) {
+      source.start(0, 0, maxSeconds);
+    } else {
+      source.start();
+    }
     return true;
   } catch {
     return false;

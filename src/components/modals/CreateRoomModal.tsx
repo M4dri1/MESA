@@ -38,7 +38,7 @@ export function CreateRoomModal() {
   const [iconError, setIconError] = useState('');
   const iconInputRef = useRef<HTMLInputElement>(null);
   const [isPrivate, setIsPrivate] = useState<boolean>(true);
-  const [isHidden, setIsHidden] = useState<boolean>(true);
+  const [isHidden, setIsHidden] = useState<boolean>(false);
   const [password, setPassword] = useState<string>('');
   const [creating, setCreating] = useState(false);
   const [createError, setCreateError] = useState('');
@@ -329,7 +329,7 @@ export function CreateRoomModal() {
                   maxLength={60}
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  placeholder="Deixe vazio para entrar apenas com código/convite"
+                  placeholder="Deixe vazio para entrar apenas com convite ou link"
                   className={FIELD_INPUT}
                 />
               </div>
@@ -337,7 +337,7 @@ export function CreateRoomModal() {
           )}
         </div>
 
-        <p className="text-xs text-slate-500 leading-relaxed">Depois de criar, você recebe um link e um código para convidar os amigos.</p>
+        <p className="text-xs text-slate-500 leading-relaxed">Depois de criar, você recebe um link para convidar os amigos.</p>
 
         {createError && (
           <p role="alert" data-testid="create-room-error" className="text-sm font-semibold text-rose-600">

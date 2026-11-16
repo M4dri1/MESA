@@ -37,14 +37,6 @@ export function MinhasSalasView() {
 
           <div className="flex flex-wrap items-center gap-3 flex-shrink-0">
             <button
-              onClick={() => setIsJoinCodeModalOpen(true)}
-              className="mesa-pill-ink h-12 px-6 whitespace-nowrap rounded-full bg-[#0b0f19] hover:bg-black text-white text-sm font-bold flex items-center gap-2 transition-colors"
-            >
-              <Hash className="w-4 h-4" />
-              <span>Entrar com código</span>
-            </button>
-
-            <button
               onClick={() => setIsCreateModalOpen(true)}
               className="h-12 px-6 whitespace-nowrap rounded-full bg-white hover:bg-[#f6f5f0] text-slate-950 font-extrabold text-sm flex items-center gap-2 transition-colors active:scale-95"
             >
