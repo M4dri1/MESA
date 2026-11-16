@@ -838,6 +838,11 @@ const dictionary: Record<string, string> = {
   "Escuro": "다크",
   "Janelas e chat em papel creme": "창과 채팅이 크림색 종이",
   "Tudo escuro, bom para a noite": "모두 어둡게, 밤에 좋아요",
+  "Mensagens e chamadas protegidas com criptografia ponta a ponta": "메시지와 통화는 종단간 암호화로 보호됩니다",
+  "Compartilhou o link \"{0}\"": "링크 \"{0}\"을(를) 공유했습니다",
+  "Sair da tela cheia": "전체 화면 종료",
+  "🔒 Mensagem criptografada": "🔒 암호화된 메시지",
+  "🔒 Nova mensagem criptografada": "🔒 새 암호화된 메시지",
 };
 
 export default dictionary;

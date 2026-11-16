@@ -50,6 +50,8 @@ export function SidebarLeft() {
     myRole,
     moderate,
     openParticipantMenu,
+    callFocus,
+    setCallFocus,
     music,
     setRoomIcon,
     notify,
@@ -315,7 +317,18 @@ export function SidebarLeft() {
               )}
 
               {/* Você */}
-              <div className="flex items-center justify-between px-2 py-1.5 rounded-xl bg-[#3044f0]/30">
+              <button
+                type="button"
+                title={`Dar foco em ${currentUser.name}`}
+                onClick={() =>
+                  setCallFocus(
+                    callFocus?.id === currentUser.id
+                      ? null
+                      : { id: currentUser.id, kind: isScreenSharing ? 'screen' : 'camera' }
+                  )
+                }
+                className="w-full flex items-center justify-between px-2 py-1.5 rounded-xl bg-[#3044f0]/30 hover:bg-[#3044f0]/45 transition-colors text-left"
+              >
                 <div className="flex items-center gap-2.5">
                   <div className="relative">
                     <Avatar
@@ -337,7 +350,7 @@ export function SidebarLeft() {
                   )}
                   {isMicOn ? <Mic className="w-3.5 h-3.5 text-emerald-400" /> : <MicOff className="w-3.5 h-3.5 text-rose-400" />}
                 </div>
-              </div>
+              </button>
             </div>
 
             {/* Código e convite */}

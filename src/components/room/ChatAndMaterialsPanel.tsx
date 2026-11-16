@@ -958,8 +958,12 @@ export function ChatAndMaterialsPanel() {
                     {!hideText && (
                       <p
                         className="text-[13px] text-slate-800 mt-0.5 leading-relaxed break-words select-text"
-                        // O que as pessoas escrevem não é traduzido; os avisos do sistema são
-                        translate={msg.senderId === 'system' ? undefined : 'no'}
+                        // O que as pessoas escrevem não é traduzido; os avisos do sistema e de arquivo compartilhado são
+                        translate={
+                          msg.senderId === 'system' || /^Compartilhou o (arquivo|link) "/.test(msg.content)
+                            ? undefined
+                            : 'no'
+                        }
                       >
                         {renderContent(msg.content, msg.mentionAll)}
                       </p>
@@ -1102,10 +1106,10 @@ export function ChatAndMaterialsPanel() {
                             <FileText className="w-5 h-5" />
                           </div>
                           <div className="flex-1 min-w-0">
-                            <span className="text-xs font-bold text-slate-900 group-hover:text-[#3044f0] transition-colors block truncate">
+                            <span translate="no" className="text-xs font-bold text-slate-900 group-hover:text-[#3044f0] transition-colors block truncate">
                               {msg.attachment.name}
                             </span>
-                            <span className="text-[10px] text-slate-500 font-mono">
+                            <span translate="no" className="text-[10px] text-slate-500 font-mono">
                               {msg.attachment.size}
                             </span>
                           </div>

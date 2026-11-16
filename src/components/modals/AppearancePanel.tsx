@@ -73,7 +73,14 @@ export function AppearancePanel() {
               type="button"
               data-testid={`theme-${preset.id}`}
               aria-pressed={selected}
-              onClick={() => update({ bg: preset.bg, accent: preset.accent, preset: preset.id, mode: theme.mode })}
+              onClick={() =>
+                update({
+                  bg: preset.bg,
+                  accent: preset.accent,
+                  preset: preset.id,
+                  mode: preset.id === 'padrao' ? 'light' : 'dark',
+                })
+              }
               className={`p-2 rounded-xl border text-left transition-colors ${
                 selected ? 'border-[#3044f0] bg-[#3044f0]/[0.07]' : 'border-slate-900/10 bg-white hover:border-slate-900/30'
               }`}
@@ -83,7 +90,7 @@ export function AppearancePanel() {
                 style={{ backgroundColor: effectiveBg(preset.bg || FALLBACK_BG) }}
               >
                 <span className="w-4 h-4 rounded-full" style={{ backgroundColor: preset.accent ? effectiveAccent(preset.accent) : '#ffd027' }} />
-                {selected && <Check className="w-3.5 h-3.5 text-slate-900" />}
+                {selected && <Check className="w-3.5 h-3.5 text-white drop-shadow" />}
               </span>
               <span className="block mt-1.5 text-[11px] font-bold text-slate-900 truncate">{preset.label}</span>
             </button>
@@ -100,7 +107,7 @@ export function AppearancePanel() {
             type="color"
             data-testid="theme-bg"
             value={effectiveBg(theme.bg || FALLBACK_BG)}
-            onChange={(e) => update({ ...theme, bg: e.target.value, preset: 'custom' })}
+            onChange={(e) => update({ ...theme, bg: e.target.value, preset: 'custom', mode: 'dark' })}
             className="w-full h-9 rounded-lg bg-transparent cursor-pointer"
           />
         </label>

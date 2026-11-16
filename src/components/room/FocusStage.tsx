@@ -1,8 +1,8 @@
 'use client';
 
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useMesa, isActiveUntil } from '@/context/MesaContext';
-import { Mic, MicOff, Monitor, Video, X } from 'lucide-react';
+import { Mic, MicOff, Monitor, Video, X, Maximize2, Minimize2 } from 'lucide-react';
 import { StreamVideo } from '@/components/common/StreamVideo';
 import { RoleBadge } from '@/components/modals/ParticipantModal';
 
@@ -30,6 +30,24 @@ export function FocusStage() {
 
   const watchRef = useRef(watchScreen);
   watchRef.current = watchScreen;
+  const stageRef = useRef<HTMLDivElement>(null);
+  const [isFullscreen, setIsFullscreen] = useState(false);
+
+  useEffect(() => {
+    const onFsChange = () => setIsFullscreen(!!document.fullscreenElement);
+    document.addEventListener('fullscreenchange', onFsChange);
+    return () => document.removeEventListener('fullscreenchange', onFsChange);
+  }, []);
+
+  const toggleFullscreen = () => {
+    const el = stageRef.current;
+    if (!el) return;
+    if (document.fullscreenElement) {
+      document.exitFullscreen().catch(() => {});
+    } else if (el.requestFullscreen) {
+      el.requestFullscreen().catch(() => {});
+    }
+  };
 
   const isMe = !!callFocus && callFocus.id === currentUser.id;
   const member = !isMe && callFocus && currentRoom ? currentRoom.members.find((m) => m.id === callFocus.id) : undefined;
@@ -71,6 +89,8 @@ export function FocusStage() {
 
   return (
     <div
+      ref={stageRef}
+      onDoubleClick={toggleFullscreen}
       data-testid="focus-stage"
       data-focus-id={callFocus.id}
       data-focus-kind={kind}
@@ -143,9 +163,23 @@ export function FocusStage() {
           )}
           <button
             type="button"
+            data-testid="focus-fullscreen"
+            title={isFullscreen ? 'Sair da tela cheia' : 'Tela cheia'}
+            aria-label={isFullscreen ? 'Sair da tela cheia' : 'Tela cheia'}
+            onClick={toggleFullscreen}
+            className="h-9 px-3 rounded-full bg-black/55 hover:bg-black/75 text-white text-xs font-extrabold flex items-center gap-1.5 transition-colors"
+          >
+            {isFullscreen ? <Minimize2 className="w-3.5 h-3.5" /> : <Maximize2 className="w-3.5 h-3.5" />}
+            <span className="hidden sm:inline">{isFullscreen ? 'Sair da tela cheia' : 'Tela cheia'}</span>
+          </button>
+          <button
+            type="button"
             data-testid="focus-exit"
             title="Sair do foco"
-            onClick={() => setCallFocus(null)}
+            onClick={() => {
+              if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
+              setCallFocus(null);
+            }}
             className="h-9 px-3.5 rounded-full bg-[#ffd027] hover:bg-[#ffdd55] text-slate-950 text-xs font-extrabold flex items-center gap-1.5 transition-colors"
           >
             <X className="w-3.5 h-3.5 stroke-[3]" />

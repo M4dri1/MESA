@@ -155,23 +155,34 @@ export function StudyRoomView() {
           <div className="flex items-center gap-2.5 sm:gap-3">
             <div className="hidden sm:flex items-center -space-x-1.5">
               {currentRoom.members.map((member) => (
-                <div key={member.id} className="ring-2 ring-[#0b0f19] rounded-full" title={member.name}>
+                <button
+                  key={member.id}
+                  type="button"
+                  onClick={() => setCallFocus({ id: member.id, kind: member.isSharingScreen ? 'screen' : 'camera' })}
+                  className="ring-2 ring-[#0b0f19] rounded-full hover:scale-105 transition-transform"
+                  title={`Dar foco em ${member.name}`}
+                >
                   <Avatar
                     letter={member.avatarLetter}
                     avatarUrl={member.avatarUrl}
                     color={member.avatarColor}
                     size="sm"
                   />
-                </div>
+                </button>
               ))}
-              <div className="ring-2 ring-[#0b0f19] rounded-full" title={`${currentUser.name} (Você)`}>
+              <button
+                type="button"
+                onClick={() => setCallFocus({ id: currentUser.id, kind: 'camera' })}
+                className="ring-2 ring-[#0b0f19] rounded-full hover:scale-105 transition-transform"
+                title={`Dar foco em ${currentUser.name}`}
+              >
                 <Avatar
                   letter={currentUser.avatarLetter}
                   avatarUrl={currentUser.avatarUrl}
                   color={currentUser.avatarColor}
                   size="sm"
                 />
-              </div>
+              </button>
             </div>
 
             {/* Invite button */}

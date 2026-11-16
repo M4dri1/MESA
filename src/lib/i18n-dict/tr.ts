@@ -836,6 +836,11 @@ const dictionary: Record<string, string> = {
   "Escuro": "Koyu",
   "Janelas e chat em papel creme": "Pencereler ve sohbet krem kâğıtta",
   "Tudo escuro, bom para a noite": "Her şey koyu, gece için iyi",
+  "Mensagens e chamadas protegidas com criptografia ponta a ponta": "Mesajlar ve aramalar uçtan uca şifreleme ile korunmaktadır",
+  "Compartilhou o link \"{0}\"": "\"{0}\" bağlantısını paylaştı",
+  "Sair da tela cheia": "Tam ekrandan çık",
+  "🔒 Mensagem criptografada": "🔒 Şifreli mesaj",
+  "🔒 Nova mensagem criptografada": "🔒 Yeni şifreli mesaj",
 };
 
 export default dictionary;

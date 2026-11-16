@@ -838,6 +838,11 @@ const dictionary: Record<string, string> = {
   "Escuro": "गहरा",
   "Janelas e chat em papel creme": "विंडो और चैट क्रीम कागज़ पर",
   "Tudo escuro, bom para a noite": "सब कुछ गहरा, रात के लिए अच्छा",
+  "Mensagens e chamadas protegidas com criptografia ponta a ponta": "संदेश और कॉल एंड-टू-एंड एन्क्रिप्शन से सुरक्षित हैं",
+  "Compartilhou o link \"{0}\"": "लिंक \"{0}\" साझा किया",
+  "Sair da tela cheia": "फ़ुल स्क्रीन से बाहर निकलें",
+  "🔒 Mensagem criptografada": "🔒 एन्क्रिप्ट किया गया संदेश",
+  "🔒 Nova mensagem criptografada": "🔒 नया एन्क्रिप्ट किया गया संदेश",
 };
 
 export default dictionary;

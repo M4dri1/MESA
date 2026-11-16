@@ -829,6 +829,11 @@ const dictionary: Record<string, string> = {
   "Escuro": "Donker",
   "Janelas e chat em papel creme": "Vensters en chat op crèmekleurig papier",
   "Tudo escuro, bom para a noite": "Alles donker, fijn voor de avond",
+  "Mensagens e chamadas protegidas com criptografia ponta a ponta": "Berichten en oproepen zijn beschermd met end-to-end-versleuteling",
+  "Compartilhou o link \"{0}\"": "Heeft de link \"{0}\" gedeeld",
+  "Sair da tela cheia": "Volledig scherm verlaten",
+  "🔒 Mensagem criptografada": "🔒 Versleuteld bericht",
+  "🔒 Nova mensagem criptografada": "🔒 Nieuw versleuteld bericht",
 };
 
 export default dictionary;

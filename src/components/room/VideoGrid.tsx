@@ -82,8 +82,7 @@ export function VideoGrid({ strip = false }: { strip?: boolean }) {
                 focusOn(member.id, !!member.isSharingScreen);
               }
             }}
-            className={`${tileClass(speaking)} cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-white`}
-            style={{ backgroundColor: camera ? '#000000' : '#17203a' }}
+            className={`${tileClass(speaking)} ${camera ? 'bg-black' : 'bg-[#17203a]'} cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-white`}
           >
             {punished && (
               <span
@@ -214,8 +213,7 @@ export function VideoGrid({ strip = false }: { strip?: boolean }) {
               focusOn(currentUser.id, isScreenSharing);
             }
           }}
-          className={`${tileClass(localSpeaking)} cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-white`}
-          style={{ backgroundColor: isCameraOn ? '#000000' : '#17203a' }}
+          className={`${tileClass(localSpeaking)} ${isCameraOn ? 'bg-black' : 'bg-[#17203a]'} cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-white`}
         >
           {soundFlash[currentUser.id] && (
             <span data-testid="sound-flash-self" className="absolute top-2 left-1/2 -translate-x-1/2 z-10 max-w-[90%] truncate px-2 py-0.5 rounded-md bg-violet-600/90 text-[11px] font-bold text-white">

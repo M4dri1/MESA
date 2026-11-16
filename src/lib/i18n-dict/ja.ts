@@ -838,6 +838,11 @@ const dictionary: Record<string, string> = {
   "Escuro": "ダーク",
   "Janelas e chat em papel creme": "ウィンドウとチャットはクリーム色",
   "Tudo escuro, bom para a noite": "すべてダーク。夜に最適",
+  "Mensagens e chamadas protegidas com criptografia ponta a ponta": "メッセージと通話はエンドツーエンド暗号化で保護されています",
+  "Compartilhou o link \"{0}\"": "リンク「{0}」を共有しました",
+  "Sair da tela cheia": "全画面表示を終了",
+  "🔒 Mensagem criptografada": "🔒 暗号化されたメッセージ",
+  "🔒 Nova mensagem criptografada": "🔒 新しい暗号化されたメッセージ",
 };
 
 export default dictionary;

@@ -826,6 +826,11 @@ const dictionary: Record<string, string> = {
   "Escuro": "Dark",
   "Janelas e chat em papel creme": "Windows and chat on cream paper",
   "Tudo escuro, bom para a noite": "Everything dark, good for the night",
+  "Mensagens e chamadas protegidas com criptografia ponta a ponta": "Messages and calls are protected with end-to-end encryption",
+  "Compartilhou o link \"{0}\"": "Shared the link \"{0}\"",
+  "Sair da tela cheia": "Exit full screen",
+  "🔒 Mensagem criptografada": "🔒 Encrypted message",
+  "🔒 Nova mensagem criptografada": "🔒 New encrypted message",
 };
 
 export default dictionary;

@@ -826,6 +826,11 @@ const dictionary: Record<string, string> = {
   "Escuro": "Dunkel",
   "Janelas e chat em papel creme": "Fenster und Chat auf cremefarbenem Papier",
   "Tudo escuro, bom para a noite": "Alles dunkel, gut für die Nacht",
+  "Mensagens e chamadas protegidas com criptografia ponta a ponta": "Nachrichten und Anrufe sind Ende-zu-Ende-verschlüsselt",
+  "Compartilhou o link \"{0}\"": "Hat den Link \"{0}\" geteilt",
+  "Sair da tela cheia": "Vollbild beenden",
+  "🔒 Mensagem criptografada": "🔒 Verschlüsselte Nachricht",
+  "🔒 Nova mensagem criptografada": "🔒 Neue verschlüsselte Nachricht",
 };
 
 export default dictionary;

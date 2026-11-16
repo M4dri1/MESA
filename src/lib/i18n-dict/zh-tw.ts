@@ -838,6 +838,11 @@ const dictionary: Record<string, string> = {
   "Escuro": "深色",
   "Janelas e chat em papel creme": "視窗與聊天使用米色紙張",
   "Tudo escuro, bom para a noite": "全部深色，適合夜間",
+  "Mensagens e chamadas protegidas com criptografia ponta a ponta": "訊息和通話受端對端加密保護",
+  "Compartilhou o link \"{0}\"": "分享了連結 \"{0}\"",
+  "Sair da tela cheia": "結束全螢幕",
+  "🔒 Mensagem criptografada": "🔒 加密訊息",
+  "🔒 Nova mensagem criptografada": "🔒 新加密訊息",
 };
 
 export default dictionary;

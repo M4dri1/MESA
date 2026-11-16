@@ -200,6 +200,29 @@ function buildOverrideCss(p: Params): string {
       if (override) css.push(override);
     }
   }
+
+  // Moldura e grandes painéis estruturais (.bg-[#3044f0] que NÃO são botões) nunca devem virar a cor viva de destaque,
+  // senão os botões amarelos/destaque lá dentro somem por falta de contraste.
+  if (p.bg) {
+    const [fr, fg, fb] = hslToRgb(p.bg.hue, clamp(0.45 * p.bg.satScale, 0, 0.72), clamp(0.06 * p.bg.lightScale, 0.012, 0.15));
+    const [sr, sg, sb] = hslToRgb(p.bg.hue, clamp(0.52 * p.bg.satScale, 0, 0.78), clamp(0.14 * p.bg.lightScale, 0.035, 0.24));
+    const [pr, pg, pb] = hslToRgb(p.bg.hue, clamp(0.41 * p.bg.satScale, 0, 0.65), clamp(0.10 * p.bg.lightScale, 0.02, 0.18));
+    const [cr, cg, cb] = hslToRgb(p.bg.hue, clamp(0.38 * p.bg.satScale, 0, 0.65), clamp(0.155 * p.bg.lightScale, 0.04, 0.24));
+    css.push(`.mesa-frame,html[data-mesa-mode="dark"] .mesa-frame{background-color:rgb(${fr} ${fg} ${fb}) !important}`);
+    css.push(`:not(button).bg-\\[\\#3044f0\\]:not(.mesa-frame){background-color:rgb(${sr} ${sg} ${sb}) !important}`);
+    css.push(
+      `html[data-mesa-mode="dark"] .mesa-paper.bg-\\[\\#f6f5f0\\],html[data-mesa-mode="dark"] .mesa-paper .bg-\\[\\#f6f5f0\\]{background-color:rgb(${pr} ${pg} ${pb}) !important}`
+    );
+    css.push(
+      `html[data-mesa-mode="dark"] .mesa-paper.bg-white,html[data-mesa-mode="dark"] .mesa-paper .bg-white{background-color:rgb(${cr} ${cg} ${cb}) !important}`
+    );
+  } else if (p.accent) {
+    const [fr, fg, fb] = hslToRgb(p.accent.hue, clamp(p.accent.sat * 0.65, 0, 0.75), 0.14);
+    const [sr, sg, sb] = hslToRgb(p.accent.hue, clamp(p.accent.sat * 0.68, 0, 0.78), 0.20);
+    css.push(`.mesa-frame{background-color:rgb(${fr} ${fg} ${fb}) !important}`);
+    css.push(`:not(button).bg-\\[\\#3044f0\\]:not(.mesa-frame){background-color:rgb(${sr} ${sg} ${sb}) !important}`);
+  }
+
   return css.join('\n');
 }
 

@@ -58,6 +58,7 @@ fs.mkdirSync(UPLOAD_DIR, { recursive: true });
 
 const KEY_DIR = path.join(__dirname, 'key');
 const MASTER_KEY_FILE = path.join(KEY_DIR, 'master.key');
+const DATA_KEY_FILE = path.join(DATA_DIR, '.master.key');
 const ENC_PREFIX = 'enc:v1:';
 const SESSION_TTL_MS = 30 * 24 * 60 * 60 * 1000; // 30 dias
 
@@ -67,12 +68,22 @@ function loadOrCreateMasterKey() {
   }
   try {
     fs.mkdirSync(KEY_DIR, { recursive: true });
-    if (fs.existsSync(MASTER_KEY_FILE)) {
-      const hex = fs.readFileSync(MASTER_KEY_FILE, 'utf8').trim();
-      if (/^[0-9a-fA-F]{64}$/.test(hex)) return Buffer.from(hex, 'hex');
+    for (const candidate of [MASTER_KEY_FILE, DATA_KEY_FILE]) {
+      if (fs.existsSync(candidate)) {
+        const hex = fs.readFileSync(candidate, 'utf8').trim();
+        if (/^[0-9a-fA-F]{64}$/.test(hex)) {
+          try {
+            if (!fs.existsSync(MASTER_KEY_FILE)) fs.writeFileSync(MASTER_KEY_FILE, hex, { mode: 0o600 });
+            if (!fs.existsSync(DATA_KEY_FILE)) fs.writeFileSync(DATA_KEY_FILE, hex, { mode: 0o600 });
+          } catch {}
+          return Buffer.from(hex, 'hex');
+        }
+      }
     }
     const key = crypto.randomBytes(32);
-    fs.writeFileSync(MASTER_KEY_FILE, key.toString('hex'), { mode: 0o600 });
+    const hex = key.toString('hex');
+    fs.writeFileSync(MASTER_KEY_FILE, hex, { mode: 0o600 });
+    try { fs.writeFileSync(DATA_KEY_FILE, hex, { mode: 0o600 }); } catch {}
     return key;
   } catch {
     return crypto.createHash('sha256').update(__dirname).digest();
