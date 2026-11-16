@@ -541,6 +541,7 @@ export function MesaProvider({ children }: { children: ReactNode }) {
   const roomIdRef = useRef<string | null>(null);
   const wsRef = useRef<WebSocket | null>(null);
   const reconnectRef = useRef<{ timer: number | null; attempts: number }>({ timer: null, attempts: 0 });
+  const pongTimerRef = useRef<number | null>(null);
   const pendingRef = useRef(new Map<number, (reply: any) => void>());
   const reqIdRef = useRef(1);
   const handlerRef = useRef<(msg: any) => void>(() => {});
@@ -599,7 +600,7 @@ export function MesaProvider({ children }: { children: ReactNode }) {
 
   const request = async (type: string, payload: Record<string, unknown> = {}): Promise<any> => {
     const reqId = reqIdRef.current++;
-    const offline = { ok: false, error: 'Sem conexão com o servidor. Tente de novo em instantes.' };
+    const offline = { ok: false, offline: true, error: 'Sem conexão com o servidor. Tente de novo em instantes.' };
     if (!(await waitForSocket(6000))) return offline;
     return new Promise((resolve) => {
       if (!wsSend({ type, reqId, ...payload })) return resolve(offline);
@@ -1171,7 +1172,7 @@ export function MesaProvider({ children }: { children: ReactNode }) {
     }
     const res = await request('room:enter', { roomId, ...(access || {}) });
     if (!res.ok) {
-      if (rejoin) resetRoomLocally();
+      if (rejoin && !res.offline) resetRoomLocally();
       if (!rejoin && (res.needsPassword || res.needsCode)) {
         setAccessPrompt({
           roomId,
@@ -2151,6 +2152,8 @@ export function MesaProvider({ children }: { children: ReactNode }) {
   /* ---------------- Conexão com o servidor ---------------- */
   const disconnect = () => {
     if (reconnectRef.current.timer) window.clearTimeout(reconnectRef.current.timer);
+    if (pongTimerRef.current) window.clearTimeout(pongTimerRef.current);
+    pongTimerRef.current = null;
     reconnectRef.current = { timer: null, attempts: 0 };
     const ws = wsRef.current;
     wsRef.current = null;
@@ -2188,18 +2191,30 @@ export function MesaProvider({ children }: { children: ReactNode }) {
     };
     ws.onmessage = (event) => {
       try {
-        handlerRef.current(JSON.parse(event.data));
+        const parsed = JSON.parse(event.data);
+        if (parsed?.type === 'pong') {
+          if (pongTimerRef.current) {
+            window.clearTimeout(pongTimerRef.current);
+            pongTimerRef.current = null;
+          }
+          return;
+        }
+        handlerRef.current(parsed);
       } catch (err) {
         console.warn('Mensagem inválida do servidor', err);
       }
     };
     ws.onclose = (event) => {
       if (wsRef.current !== ws) return;
+      if (pongTimerRef.current) {
+        window.clearTimeout(pongTimerRef.current);
+        pongTimerRef.current = null;
+      }
       wsRef.current = null;
       setIsConnected(false);
       teardownPeers();
       setParticipants([]);
-      pendingRef.current.forEach((resolve) => resolve({ ok: false, error: 'A conexão com o servidor caiu.' }));
+      pendingRef.current.forEach((resolve) => resolve({ ok: false, offline: true, error: 'A conexão com o servidor caiu.' }));
       pendingRef.current.clear();
       if (event.code === 4001) return forceSignOut();
       if (!tokenRef.current) return;
@@ -2259,6 +2274,71 @@ export function MesaProvider({ children }: { children: ReactNode }) {
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Ao acordar o celular / voltar para a aba / retomar internet: reconecta na hora ou testa se o socket ainda responde
+  useEffect(() => {
+    const checkConnection = () => {
+      if (document.visibilityState === 'hidden') return;
+      if (!tokenRef.current) return;
+      const ws = wsRef.current;
+      if (!ws || ws.readyState === WebSocket.CLOSED || ws.readyState === WebSocket.CLOSING) {
+        if (reconnectRef.current.timer) {
+          window.clearTimeout(reconnectRef.current.timer);
+          reconnectRef.current.timer = null;
+        }
+        reconnectRef.current.attempts = 0;
+        connect();
+        return;
+      }
+      if (ws.readyState === WebSocket.OPEN) {
+        if (pongTimerRef.current) window.clearTimeout(pongTimerRef.current);
+        wsSend({ type: 'ping' });
+        pongTimerRef.current = window.setTimeout(() => {
+          pongTimerRef.current = null;
+          if (wsRef.current === ws && ws.readyState === WebSocket.OPEN) {
+            ws.close();
+          }
+        }, 3000);
+      }
+    };
+    document.addEventListener('visibilitychange', checkConnection);
+    window.addEventListener('pageshow', checkConnection);
+    window.addEventListener('online', checkConnection);
+    return () => {
+      document.removeEventListener('visibilitychange', checkConnection);
+      window.removeEventListener('pageshow', checkConnection);
+      window.removeEventListener('online', checkConnection);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Mantém a tela acordada enquanto a pessoa está em uma chamada (nos navegadores com Screen Wake Lock)
+  useEffect(() => {
+    if (!currentRoomId) return;
+    let sentinel: { release?: () => Promise<void> } | null = null;
+    let active = true;
+    const requestWakeLock = async () => {
+      if (!active || document.visibilityState !== 'visible') return;
+      try {
+        const nav = navigator as Navigator & { wakeLock?: { request: (type: 'screen') => Promise<{ release?: () => Promise<void> }> } };
+        if (nav.wakeLock) {
+          sentinel = await nav.wakeLock.request('screen');
+        }
+      } catch {}
+    };
+    void requestWakeLock();
+    const onVisible = () => {
+      if (document.visibilityState === 'visible') void requestWakeLock();
+    };
+    document.addEventListener('visibilitychange', onVisible);
+    return () => {
+      active = false;
+      document.removeEventListener('visibilitychange', onVisible);
+      try {
+        void sentinel?.release?.();
+      } catch {}
+    };
+  }, [currentRoomId]);
 
   /* ---------------- Contas ---------------- */
   const openAuthModal = (mode: 'login' | 'signup' = 'signup') => {

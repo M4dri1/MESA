@@ -32,6 +32,7 @@ const DB_FILE = path.join(DATA_DIR, 'db.json');
 // 100 MB é o teto do túnel gratuito do Cloudflare para um envio; acima disso ele recusa antes de chegar aqui
 const MAX_UPLOAD_BYTES = 100 * 1024 * 1024;
 const MAX_CALL_SIZE = 12;
+const CALL_RECONNECT_GRACE_MS = 45000;
 // Quantas mensagens cada sala guarda (a busca do chat olha todas elas; 50 000 é anos de conversa de uma turma)
 const MAX_MESSAGES_PER_ROOM = 50000;
 // Mensagens por página quando o navegador pede o histórico antigo (a busca)
@@ -786,6 +787,10 @@ function removeFromCall(roomId, userId) {
   const map = calls.get(roomId);
   if (!map || !map.has(userId)) return;
   const entry = map.get(userId);
+  if (entry.graceTimer) {
+    clearTimeout(entry.graceTimer);
+    entry.graceTimer = null;
+  }
   const wasWatching = entry.watching || null;
   if (entry.ws) entry.ws.roomId = null;
   map.delete(userId);
@@ -1995,16 +2000,33 @@ function handleSocketMessage(ws, msg) {
         return fail(`A sala está cheia (máximo de ${MAX_CALL_SIZE} pessoas na chamada).`);
       }
 
-      // Uma pessoa só fica em uma chamada por vez
+      // Uma pessoa só fica em uma chamada por vez (se reconectou na mesma sala durante a tolerância, só troca o socket)
+      let reconnectedInPlace = false;
       for (const [roomId, map] of [...calls]) {
         const entry = map.get(user.id);
         if (!entry) continue;
-        if (entry.ws !== ws) send(entry.ws, { type: 'call:replaced' });
+        if (entry.graceTimer) {
+          clearTimeout(entry.graceTimer);
+          entry.graceTimer = null;
+        }
+        if (roomId === room.id) {
+          if (entry.ws && entry.ws !== ws && entry.ws.readyState === WebSocket.OPEN) {
+            send(entry.ws, { type: 'call:replaced' });
+          } else {
+            reconnectedInPlace = true;
+          }
+          entry.ws = ws;
+          ws.roomId = room.id;
+          continue;
+        }
+        if (entry.ws && entry.ws !== ws) send(entry.ws, { type: 'call:replaced' });
         removeFromCall(roomId, user.id);
       }
 
       if (!calls.has(room.id)) calls.set(room.id, new Map());
-      calls.get(room.id).set(user.id, { ws, media: DEFAULT_MEDIA() });
+      if (!calls.get(room.id).has(user.id)) {
+        calls.get(room.id).set(user.id, { ws, media: DEFAULT_MEDIA(), graceTimer: null });
+      }
       ws.roomId = room.id;
 
       const participants = [...callOf(room.id).keys()]
@@ -2013,7 +2035,7 @@ function handleSocketMessage(ws, msg) {
         .filter(Boolean);
 
       let joinSound = null;
-      if (!already && user.joinSoundId && !punishedUntil(room, user.id)) {
+      if (!already && !reconnectedInPlace && user.joinSoundId && !punishedUntil(room, user.id)) {
         const s = (db.sounds[user.id] || []).find((item) => item.id === user.joinSoundId);
         if (s && db.files[s.id]) {
           joinSound = { userId: user.id, name: s.name, emoji: s.emoji || '🔊', url: soundUrl(s.id), maxDuration: 5 };
@@ -2032,7 +2054,9 @@ function handleSocketMessage(ws, msg) {
         pomodoro: pomodoroDto(room.id),
         ...(joinSound ? { joinSound } : {}),
       });
-      broadcastCall(room.id, { type: 'peer:joined', roomId: room.id, user: memberDto(user.id, room.id) }, user.id);
+      if (!reconnectedInPlace) {
+        broadcastCall(room.id, { type: 'peer:joined', roomId: room.id, user: memberDto(user.id, room.id) }, user.id);
+      }
       if (joinSound) {
         broadcastCall(room.id, { type: 'sound:play', roomId: room.id, ...joinSound }, user.id);
       }
@@ -2607,7 +2631,7 @@ app.prepare().then(() => {
     wss.handleUpgrade(req, socket, head, (ws) => {
       ws.userId = null;
       ws.roomId = null;
-      ws.isAlive = true;
+      ws.missedPings = 0;
 
       let authTimeout = null;
       const authenticateSocket = (token) => {
@@ -2633,12 +2657,19 @@ app.prepare().then(() => {
         if (!ws.userId && !authenticateSocket(cookieToken(req))) ws.close(4001, 'sessao invalida');
       }, 5000);
 
-      ws.on('pong', () => (ws.isAlive = true));
+      ws.on('pong', () => {
+        ws.missedPings = 0;
+      });
       ws.on('message', (raw) => {
+        ws.missedPings = 0;
         let msg;
         try {
           msg = JSON.parse(raw.toString());
         } catch {
+          return;
+        }
+        if (msg && msg.type === 'ping') {
+          send(ws, { type: 'pong' });
           return;
         }
         if (msg && msg.type === 'auth') {
@@ -2656,7 +2687,21 @@ app.prepare().then(() => {
       ws.on('close', () => {
         if (authTimeout) clearTimeout(authTimeout);
         if (!ws.userId) return;
-        if (ws.roomId) removeFromCall(ws.roomId, ws.userId);
+        const closingRoomId = ws.roomId;
+        const closingUserId = ws.userId;
+        if (closingRoomId) {
+          const entry = callOf(closingRoomId).get(closingUserId);
+          if (entry && entry.ws === ws) {
+            if (entry.graceTimer) clearTimeout(entry.graceTimer);
+            entry.graceTimer = setTimeout(() => {
+              const current = callOf(closingRoomId).get(closingUserId);
+              if (current && current.ws === ws) {
+                removeFromCall(closingRoomId, closingUserId);
+                pushStateAll();
+              }
+            }, CALL_RECONNECT_GRACE_MS);
+          }
+        }
         const set = sockets.get(ws.userId);
         if (set) {
           set.delete(ws);
@@ -2667,11 +2712,11 @@ app.prepare().then(() => {
     });
   });
 
-  // Derruba conexões mortas e mantém o túnel acordado
+  // Derruba conexões mortas após 3 pings sem resposta (~75-100s) para tolerar suspensão no celular
   setInterval(() => {
     wss.clients.forEach((ws) => {
-      if (!ws.isAlive) return ws.terminate();
-      ws.isAlive = false;
+      if (ws.missedPings >= 3) return ws.terminate();
+      ws.missedPings = (ws.missedPings || 0) + 1;
       ws.ping();
     });
   }, 25000);
