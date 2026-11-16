@@ -9,6 +9,7 @@ import { shrinkAvatar } from '@/lib/api';
 import { normalizeRoomColor } from '@/utils/roomColor';
 import { COLOR_OPTIONS } from './CreateRoomModal';
 import { ImagePickerModal } from '@/components/common/ImagePickerModal';
+import { ColorField } from '@/components/common/ColorField';
 import { mediaTransformStyle } from '@/utils/mediaTransform';
 
 /** Configurações de uma sala que já existe: nome, matéria, quem pode entrar, cor e foto (dono e adm) */
@@ -311,6 +312,17 @@ function RoomSettingsForm({ room }: { room: Room }) {
                     className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
                   />
                 </label>
+              </div>
+              <div className="mt-3 flex items-center gap-2">
+                <span className="text-[11px] font-bold text-slate-600">Código da cor</span>
+                <ColorField
+                  hexOnly
+                  size="sm"
+                  testId="room-settings-color-hex-field"
+                  value={color}
+                  onChange={(hex) => setColor(normalizeRoomColor(hex))}
+                  className="w-32"
+                />
               </div>
             </div>
 

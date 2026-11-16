@@ -10,6 +10,7 @@ import { shrinkAvatar } from '@/lib/api';
 import { normalizeRoomColor } from '@/utils/roomColor';
 import { RoomCard } from '@/components/rooms/RoomCard';
 import { ImagePickerModal } from '@/components/common/ImagePickerModal';
+import { ColorField } from '@/components/common/ColorField';
 
 const SUBJECT_OPTIONS: SubjectType[] = [
   'Matemática',
@@ -202,6 +203,17 @@ export function CreateRoomModal() {
                 className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
               />
             </label>
+          </div>
+          <div className="mt-3 flex items-center gap-2">
+            <span className="text-[11px] font-bold text-slate-600">Código da cor</span>
+            <ColorField
+              hexOnly
+              size="sm"
+              testId="room-color-hex-field"
+              value={color}
+              onChange={(hex) => setColor(normalizeRoomColor(hex))}
+              className="w-32"
+            />
           </div>
           {!isPreset && <p className="text-xs text-slate-500 mt-2">Cores muito claras ficam mais escuras para o texto continuar legível.</p>}
         </div>

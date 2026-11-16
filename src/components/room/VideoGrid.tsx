@@ -49,7 +49,7 @@ export function VideoGrid({ strip = false }: { strip?: boolean }) {
   const focusOn = (id: string, sharing: boolean) => setCallFocus({ id, kind: sharing ? 'screen' : 'camera' });
 
   const containerClass = strip
-    ? 'w-full max-w-5xl flex gap-2.5 overflow-x-auto no-scrollbar mt-3 px-1 flex-shrink-0'
+    ? 'w-full max-w-5xl flex gap-3 overflow-x-auto no-scrollbar mt-1.5 px-2 py-2 flex-shrink-0'
     : `w-full transition-all duration-300 ${
         isExpandedGrid
           ? 'max-w-5xl grid grid-cols-[repeat(auto-fit,minmax(240px,1fr))] gap-4 p-4 my-auto'

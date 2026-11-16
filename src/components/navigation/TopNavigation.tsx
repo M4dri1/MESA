@@ -14,6 +14,7 @@ export function TopNavigation() {
     logout,
     currentRoom,
     setCurrentRoomId,
+    requestLeaveRoom,
     currentUser,
     soundEnabled,
     toggleSoundEffects,
@@ -29,7 +30,7 @@ export function TopNavigation() {
     <header className="h-16 px-4 md:px-6 flex items-center justify-between flex-shrink-0 select-none z-30">
       {/* Marca: a mesma da tela inicial */}
       <div className="flex items-center gap-3">
-        <div onClick={() => setCurrentRoomId(null)} className="flex items-center gap-2.5 cursor-pointer group">
+        <div onClick={() => (currentRoom ? requestLeaveRoom() : setCurrentRoomId(null))} className="flex items-center gap-2.5 cursor-pointer group">
           <div className="w-9 h-9 rounded-xl bg-[#ffd027] flex items-center justify-center font-black text-[#0b0f19] text-base group-hover:rotate-[-6deg] transition-transform">
             M
           </div>
@@ -68,17 +69,17 @@ export function TopNavigation() {
           <div className="relative">
             <button
               onClick={() => setShowUserMenu((v) => !v)}
-              className="h-10 pl-1 pr-3 sm:pr-4 rounded-full bg-white hover:bg-[#f6f5f0] flex items-center gap-2.5 transition-colors"
+              className="h-10 pl-1 pr-3 sm:pr-4 rounded-full bg-[#ffd027] hover:bg-[#ffdd55] flex items-center gap-2.5 transition-colors"
               title="Meu Perfil"
             >
               <Avatar letter={currentUser.avatarLetter} avatarUrl={currentUser.avatarUrl} color={currentUser.avatarColor} borderColor={currentUser.borderColor} size="sm" />
               <div className="hidden sm:flex flex-col text-left">
                 <span className="text-xs font-extrabold text-slate-950 leading-tight">{currentUser.name}</span>
-                <span className="text-[10px] text-slate-500 leading-tight font-semibold flex items-center gap-1">
+                <span className="text-[10px] text-slate-800 leading-tight font-semibold flex items-center gap-1">
                   <span className={`w-1.5 h-1.5 rounded-full ${presenceOption?.dot || 'bg-emerald-500'}`} /> {presenceOption?.label || 'Online'}
                 </span>
               </div>
-              <ChevronDown className="w-3.5 h-3.5 text-slate-500 hidden sm:block" />
+              <ChevronDown className="w-3.5 h-3.5 text-slate-800 hidden sm:block" />
             </button>
 
             {/* Menu do perfil: papel creme, como os popups */}

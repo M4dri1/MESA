@@ -162,6 +162,8 @@ interface MesaContextType {
   }) => Promise<Room | null>;
   joinRoomByCode: (code: string, password?: string) => Promise<boolean>;
   deleteRoom: (roomId: string) => void;
+  /** Volta para "Minhas salas" perguntando antes se estiver numa chamada */
+  requestLeaveRoom: () => void;
 
   // Call controls
   isMicOn: boolean;
@@ -424,7 +426,7 @@ export function MesaProvider({ children }: { children: ReactNode }) {
   } | null>(null);
   const [accessInput, setAccessInput] = useState('');
   const [accessBusy, setAccessBusy] = useState(false);
-  const [switchPrompt, setSwitchPrompt] = useState<{ roomId: string; roomName: string; fromName: string } | null>(null);
+  const [switchPrompt, setSwitchPrompt] = useState<{ roomId: string | null; roomName: string; fromName: string } | null>(null);
 
   const [allMessages, setAllMessages] = useState<Record<string, ChatMessage[]>>({});
   const [olderMessages, setOlderMessages] = useState<Record<string, ChatMessage[]>>({});
@@ -1242,6 +1244,12 @@ export function MesaProvider({ children }: { children: ReactNode }) {
     wsSend({ type: 'room:leave' });
     resetRoomLocally();
     playLeaveRoomSound();
+  };
+
+  /** Volta para "Minhas salas": se estiver numa chamada, pergunta antes de sair */
+  const requestLeaveRoom = () => {
+    if (!roomIdRef.current) return;
+    setSwitchPrompt({ roomId: null, roomName: '', fromName: enteredRoom?.name || 'a sala atual' });
   };
 
   const setCurrentRoomId = (id: string | null) => {
@@ -2483,6 +2491,7 @@ export function MesaProvider({ children }: { children: ReactNode }) {
         createRoom,
         joinRoomByCode,
         deleteRoom,
+        requestLeaveRoom,
 
         isMicOn,
         isCameraOn,
@@ -2619,9 +2628,19 @@ export function MesaProvider({ children }: { children: ReactNode }) {
             className="mesa-paper w-full max-w-md rounded-3xl bg-[#f6f5f0] text-slate-900 p-6 shadow-2xl space-y-4"
           >
             <div>
-              <h3 className="landing-display text-xl text-slate-950">Trocar de sala?</h3>
+              <h3 className="landing-display text-xl text-slate-950">
+                {switchPrompt.roomId ? 'Trocar de sala?' : 'Sair da sala?'}
+              </h3>
               <p className="text-xs text-slate-600 mt-1.5 leading-relaxed">
-                Você está na chamada de <strong translate="no" className="text-slate-900">&ldquo;{switchPrompt.fromName}&rdquo;</strong>. Deseja sair dela para entrar em <strong translate="no" className="text-slate-900">&ldquo;{switchPrompt.roomName}&rdquo;</strong>?
+                {switchPrompt.roomId ? (
+                  <>
+                    Você está na chamada de <strong translate="no" className="text-slate-900">&ldquo;{switchPrompt.fromName}&rdquo;</strong>. Deseja sair dela para entrar em <strong translate="no" className="text-slate-900">&ldquo;{switchPrompt.roomName}&rdquo;</strong>?
+                  </>
+                ) : (
+                  <>
+                    Você está na chamada de <strong translate="no" className="text-slate-900">&ldquo;{switchPrompt.fromName}&rdquo;</strong>. Deseja sair dela e voltar para Minhas salas?
+                  </>
+                )}
               </p>
             </div>
             <div className="flex items-center justify-end gap-2 pt-1">
@@ -2638,11 +2657,12 @@ export function MesaProvider({ children }: { children: ReactNode }) {
                 onClick={() => {
                   const targetId = switchPrompt.roomId;
                   setSwitchPrompt(null);
-                  void enterRoom(targetId);
+                  if (targetId) void enterRoom(targetId);
+                  else leaveRoom();
                 }}
                 className="h-10 px-5 rounded-full bg-[#0b0f19] hover:bg-slate-800 text-white text-xs font-extrabold"
               >
-                Sim, trocar de sala
+                {switchPrompt.roomId ? 'Sim, trocar de sala' : 'Sim, sair da sala'}
               </button>
             </div>
           </div>

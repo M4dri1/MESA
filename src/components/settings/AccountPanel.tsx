@@ -5,6 +5,7 @@ import { AtSign, Camera, Check, ChevronDown, Image as ImageIcon, LogOut, Mail, M
 import { useMesa } from '@/context/MesaContext';
 import { Avatar } from '@/components/common/Avatar';
 import { ImagePickerModal } from '@/components/common/ImagePickerModal';
+import { ColorField } from '@/components/common/ColorField';
 import { mediaTransformStyle } from '@/utils/mediaTransform';
 import { playClip } from '@/utils/soundpadPlayer';
 import { playJoinRoomSound } from '@/utils/soundEffects';
@@ -243,20 +244,14 @@ export function AccountPanel({
 
           {/* Cores do perfil: Cor do banner (quando não tem foto) e Cor da borda da foto */}
           <div className="px-4 pb-4 pt-2 border-t border-slate-900/10 grid grid-cols-1 sm:grid-cols-2 gap-3 items-stretch">
-            <label className="p-2.5 rounded-xl bg-white border border-slate-900/10 cursor-pointer flex flex-col justify-between">
+            <div className="p-2.5 rounded-xl bg-white border border-slate-900/10 flex flex-col justify-between">
               <div>
                 <span className="block text-xs font-bold text-slate-900">Cor do banner</span>
                 <span className="block text-[11px] text-slate-500 mb-1.5">Aparece quando você não usa foto no banner</span>
               </div>
-              <input
-                type="color"
-                data-testid="profile-banner-color"
-                value={bannerColor}
-                onChange={(e) => setBannerColor(e.target.value)}
-                className="w-full h-8 rounded-lg bg-transparent cursor-pointer"
-              />
-            </label>
-            <label className="p-2.5 rounded-xl bg-white border border-slate-900/10 cursor-pointer flex flex-col justify-between">
+              <ColorField size="sm" testId="profile-banner-color" value={bannerColor} onChange={setBannerColor} />
+            </div>
+            <div className="p-2.5 rounded-xl bg-white border border-slate-900/10 flex flex-col justify-between">
               <div className="flex items-start justify-between gap-1">
                 <div>
                   <span className="block text-xs font-bold text-slate-900">Cor da borda da foto</span>
@@ -265,24 +260,15 @@ export function AccountPanel({
                 {borderColor && (
                   <button
                     type="button"
-                    onClick={(e) => {
-                      e.preventDefault();
-                      setBorderColor('');
-                    }}
+                    onClick={() => setBorderColor('')}
                     className="text-[10px] font-bold text-[#3044f0] hover:underline flex-shrink-0"
                   >
                     Padrão
                   </button>
                 )}
               </div>
-              <input
-                type="color"
-                data-testid="profile-border-color"
-                value={borderColor || '#ffd027'}
-                onChange={(e) => setBorderColor(e.target.value)}
-                className="w-full h-8 rounded-lg bg-transparent cursor-pointer"
-              />
-            </label>
+              <ColorField size="sm" testId="profile-border-color" value={borderColor || '#ffd027'} onChange={setBorderColor} />
+            </div>
           </div>
         </div>
 

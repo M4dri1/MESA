@@ -2,6 +2,7 @@
 
 import React, { useEffect, useRef, useState } from 'react';
 import { useMesa } from '@/context/MesaContext';
+import { ColorField } from '@/components/common/ColorField';
 import { BoardStroke } from '@/types';
 import { Pencil, Eraser, Minus, Square, Circle, Undo2, Trash2, Download, Hand, ZoomIn, ZoomOut } from 'lucide-react';
 
@@ -439,6 +440,15 @@ export function Whiteboard() {
               className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
             />
           </label>
+          <ColorField
+            hexOnly
+            dark
+            size="sm"
+            testId="board-color-hex-field"
+            value={color}
+            onChange={(hex) => pickColor(hex)}
+            className="w-[5.5rem]"
+          />
         </div>
 
         <div className="flex items-center gap-0.5">

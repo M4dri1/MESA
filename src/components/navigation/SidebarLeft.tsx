@@ -54,6 +54,7 @@ export function SidebarLeft() {
     openParticipantMenu,
     callFocus,
     setCallFocus,
+    requestLeaveRoom,
     music,
     setRoomIcon,
     notify,
@@ -103,7 +104,7 @@ export function SidebarLeft() {
       <div className="w-14 md:w-[72px] flex flex-col items-center py-2 gap-3 z-20">
         {/* Início */}
         <button
-          onClick={() => setCurrentRoomId(null)}
+          onClick={() => (currentRoom ? requestLeaveRoom() : setCurrentRoomId(null))}
           title="Minhas salas (Início)"
           className={`relative group w-10 h-10 md:w-12 md:h-12 flex items-center justify-center font-black text-base md:text-lg transition-all duration-200 ${
             currentRoom === null

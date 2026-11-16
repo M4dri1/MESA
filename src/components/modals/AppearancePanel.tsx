@@ -3,6 +3,7 @@
 import React, { useEffect, useState } from 'react';
 import { THEME_PRESETS, ThemeSettings, applyTheme, effectiveAccent, effectiveBg, loadTheme, saveTheme, DEFAULT_THEME } from '@/lib/theme';
 import { Palette, RotateCcw, Check, Sun, Moon } from 'lucide-react';
+import { ColorField } from '@/components/common/ColorField';
 
 const FALLBACK_BG = '#0b0f19';
 const FALLBACK_ACCENT = '#ffd027';
@@ -101,33 +102,29 @@ export function AppearancePanel() {
 
       <p className="text-xs font-bold text-slate-700 mt-5 mb-2">Escolher as cores</p>
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 items-stretch">
-        <label className="p-3 rounded-xl bg-[#f6f5f0] border border-slate-900/10 cursor-pointer flex flex-col justify-between">
+        <div className="p-3 rounded-xl bg-[#f6f5f0] border border-slate-900/10 flex flex-col justify-between">
           <div>
             <span className="block text-xs font-bold text-slate-900">Fundo</span>
             <span className="block text-[11px] text-slate-500 mb-2">Palco, barras e moldura</span>
           </div>
-          <input
-            type="color"
-            data-testid="theme-bg"
+          <ColorField
+            testId="theme-bg"
             value={theme.bg || FALLBACK_BG}
-            onChange={(e) => update({ ...theme, bg: e.target.value, preset: 'custom' })}
-            className="w-full h-9 rounded-lg bg-transparent cursor-pointer"
+            onChange={(hex) => update({ ...theme, bg: hex, preset: 'custom' })}
           />
-        </label>
-        <label className="p-3 rounded-xl bg-[#f6f5f0] border border-slate-900/10 cursor-pointer flex flex-col justify-between">
+        </div>
+        <div className="p-3 rounded-xl bg-[#f6f5f0] border border-slate-900/10 flex flex-col justify-between">
           <div>
             <span className="block text-xs font-bold text-slate-900">Destaque</span>
             <span className="block text-[11px] text-slate-500 mb-2">Botões, abas e a cor da marca</span>
           </div>
-          <input
-            type="color"
-            data-testid="theme-accent"
+          <ColorField
+            testId="theme-accent"
             value={theme.accent || FALLBACK_ACCENT}
-            onChange={(e) => update({ ...theme, accent: e.target.value, preset: 'custom' })}
-            className="w-full h-9 rounded-lg bg-transparent cursor-pointer"
+            onChange={(hex) => update({ ...theme, accent: hex, preset: 'custom' })}
           />
-        </label>
-        <label className="p-3 rounded-xl bg-[#f6f5f0] border border-slate-900/10 cursor-pointer flex flex-col justify-between">
+        </div>
+        <div className="p-3 rounded-xl bg-[#f6f5f0] border border-slate-900/10 flex flex-col justify-between">
           <div className="flex items-start justify-between gap-1">
             <div>
               <span className="block text-xs font-bold text-slate-900">Cor do chat</span>
@@ -136,24 +133,19 @@ export function AppearancePanel() {
             {theme.chat && (
               <button
                 type="button"
-                onClick={(e) => {
-                  e.preventDefault();
-                  update({ ...theme, chat: null });
-                }}
+                onClick={() => update({ ...theme, chat: null })}
                 className="text-[10px] font-bold text-[#3044f0] hover:underline flex-shrink-0"
               >
                 Padrão
               </button>
             )}
           </div>
-          <input
-            type="color"
-            data-testid="theme-chat"
+          <ColorField
+            testId="theme-chat"
             value={theme.chat || (theme.mode === 'dark' ? '#0f1524' : '#f6f5f0')}
-            onChange={(e) => update({ ...theme, chat: e.target.value })}
-            className="w-full h-9 rounded-lg bg-transparent cursor-pointer"
+            onChange={(hex) => update({ ...theme, chat: hex })}
           />
-        </label>
+        </div>
       </div>
 
       <div className="mt-5 flex items-center justify-between gap-3">
