@@ -106,7 +106,7 @@ export function AppearancePanel() {
           <input
             type="color"
             data-testid="theme-bg"
-            value={effectiveBg(theme.bg || FALLBACK_BG)}
+            value={theme.bg || FALLBACK_BG}
             onChange={(e) => update({ ...theme, bg: e.target.value, preset: 'custom', mode: 'dark' })}
             className="w-full h-9 rounded-lg bg-transparent cursor-pointer"
           />
@@ -117,7 +117,7 @@ export function AppearancePanel() {
           <input
             type="color"
             data-testid="theme-accent"
-            value={theme.accent ? effectiveAccent(theme.accent) : FALLBACK_ACCENT}
+            value={theme.accent || FALLBACK_ACCENT}
             onChange={(e) => update({ ...theme, accent: e.target.value, preset: 'custom' })}
             className="w-full h-9 rounded-lg bg-transparent cursor-pointer"
           />

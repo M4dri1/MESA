@@ -31,7 +31,12 @@ export function FocusStage() {
   const watchRef = useRef(watchScreen);
   watchRef.current = watchScreen;
   const stageRef = useRef<HTMLDivElement>(null);
+  const openedAtRef = useRef<number>(Date.now());
   const [isFullscreen, setIsFullscreen] = useState(false);
+
+  useEffect(() => {
+    openedAtRef.current = Date.now();
+  }, [callFocus?.id]);
 
   useEffect(() => {
     const onFsChange = () => setIsFullscreen(!!document.fullscreenElement);
@@ -46,6 +51,14 @@ export function FocusStage() {
       document.exitFullscreen().catch(() => {});
     } else if (el.requestFullscreen) {
       el.requestFullscreen().catch(() => {});
+    }
+  };
+
+  const handleStageClick = (e: React.MouseEvent<HTMLDivElement>) => {
+    if ((e.target as HTMLElement).closest('button')) return;
+    // Se a pessoa deu dois cliques no quadradinho da grade, o 1º clique abriu o foco e o 2º cai aqui logo em seguida
+    if (Date.now() - openedAtRef.current < 420) {
+      toggleFullscreen();
     }
   };
 
@@ -90,13 +103,17 @@ export function FocusStage() {
   return (
     <div
       ref={stageRef}
-      onDoubleClick={toggleFullscreen}
+      onClick={handleStageClick}
+      onDoubleClick={(e) => {
+        if ((e.target as HTMLElement).closest('button')) return;
+        toggleFullscreen();
+      }}
       data-testid="focus-stage"
       data-focus-id={callFocus.id}
       data-focus-kind={kind}
-      className={`relative w-full max-w-5xl flex-1 min-h-[220px] rounded-2xl overflow-hidden flex items-center justify-center ${
-        kind === 'screen' ? 'bg-black' : 'bg-[#17203a]'
-      } ${speaking && kind === 'camera' ? 'ring-2 ring-emerald-400' : ''}`}
+      className={`relative overflow-hidden flex items-center justify-center ${
+        isFullscreen ? 'w-screen h-screen max-w-none rounded-none' : 'w-full max-w-5xl flex-1 min-h-[220px] rounded-2xl'
+      } ${kind === 'screen' ? 'bg-black' : 'bg-[#17203a]'} ${speaking && kind === 'camera' ? 'ring-2 ring-emerald-400' : ''}`}
     >
       {kind === 'screen' ? (
         screenStream ? (

@@ -25,12 +25,12 @@ export const DEFAULT_THEME: ThemeSettings = { bg: null, accent: null, preset: 'p
 export const THEME_PRESETS: { id: string; label: string; bg: string | null; accent: string | null }[] = [
   { id: 'padrao', label: 'Mesa (padrão)', bg: null, accent: null },
   { id: 'preto', label: 'Preto', bg: '#060606', accent: null },
-  { id: 'grafite', label: 'Grafite', bg: '#17191f', accent: '#6d8dff' },
-  { id: 'floresta', label: 'Floresta', bg: '#08140f', accent: '#34d399' },
-  { id: 'oceano', label: 'Oceano', bg: '#061820', accent: '#22d3ee' },
-  { id: 'roxo', label: 'Roxo', bg: '#130b22', accent: '#a78bfa' },
-  { id: 'vinho', label: 'Vinho', bg: '#1b0b12', accent: '#f472b6' },
-  { id: 'por-do-sol', label: 'Pôr do sol', bg: '#1c0f08', accent: '#fb923c' },
+  { id: 'grafite', label: 'Grafite', bg: '#1c2029', accent: '#6d8dff' },
+  { id: 'floresta', label: 'Floresta', bg: '#0c261c', accent: '#34d399' },
+  { id: 'oceano', label: 'Oceano', bg: '#092432', accent: '#22d3ee' },
+  { id: 'roxo', label: 'Roxo', bg: '#1d1036', accent: '#a78bfa' },
+  { id: 'vinho', label: 'Vinho', bg: '#2b0f1b', accent: '#f472b6' },
+  { id: 'por-do-sol', label: 'Pôr do sol', bg: '#2c160a', accent: '#fb923c' },
 ];
 
 const STORAGE_KEY = 'mesa_theme';
@@ -108,8 +108,8 @@ function buildParams(theme: ThemeSettings): Params {
     const [h, s, l] = rgbToHsl(...hexToRgb(theme.bg));
     params.bg = {
       hue: h,
-      satScale: clamp(s / REF_BG_SAT, 0, 2.2),
-      lightScale: clamp(Math.min(l, 0.2) / REF_BG_LIGHT, 0.35, 2.7),
+      satScale: clamp(s / REF_BG_SAT, s > 0.08 ? 1.25 : 0, 2.4),
+      lightScale: clamp(Math.min(l, 0.24) / REF_BG_LIGHT, 0.35, 3.0),
     };
   }
   if (theme.accent) {
@@ -204,12 +204,16 @@ function buildOverrideCss(p: Params): string {
   // Moldura e grandes painéis estruturais (.bg-[#3044f0] que NÃO são botões) nunca devem virar a cor viva de destaque,
   // senão os botões amarelos/destaque lá dentro somem por falta de contraste.
   if (p.bg) {
-    const [fr, fg, fb] = hslToRgb(p.bg.hue, clamp(0.45 * p.bg.satScale, 0, 0.72), clamp(0.06 * p.bg.lightScale, 0.012, 0.15));
-    const [sr, sg, sb] = hslToRgb(p.bg.hue, clamp(0.52 * p.bg.satScale, 0, 0.78), clamp(0.14 * p.bg.lightScale, 0.035, 0.24));
-    const [pr, pg, pb] = hslToRgb(p.bg.hue, clamp(0.41 * p.bg.satScale, 0, 0.65), clamp(0.10 * p.bg.lightScale, 0.02, 0.18));
-    const [cr, cg, cb] = hslToRgb(p.bg.hue, clamp(0.38 * p.bg.satScale, 0, 0.65), clamp(0.155 * p.bg.lightScale, 0.04, 0.24));
+    const [fr, fg, fb] = hslToRgb(p.bg.hue, clamp(0.55 * p.bg.satScale, 0, 0.8), clamp(0.065 * p.bg.lightScale, 0.012, 0.17));
+    const [sr, sg, sb] = hslToRgb(p.bg.hue, clamp(0.62 * p.bg.satScale, 0, 0.85), clamp(0.15 * p.bg.lightScale, 0.04, 0.26));
+    const [pr, pg, pb] = hslToRgb(p.bg.hue, clamp(0.50 * p.bg.satScale, 0, 0.75), clamp(0.105 * p.bg.lightScale, 0.02, 0.20));
+    const [cr, cg, cb] = hslToRgb(p.bg.hue, clamp(0.46 * p.bg.satScale, 0, 0.75), clamp(0.16 * p.bg.lightScale, 0.04, 0.26));
+    const [lr, lg, lb] = hslToRgb(p.bg.hue, clamp(0.28 * p.bg.satScale, 0, 0.45), 0.92);
     css.push(`.mesa-frame,html[data-mesa-mode="dark"] .mesa-frame{background-color:rgb(${fr} ${fg} ${fb}) !important}`);
     css.push(`:not(button).bg-\\[\\#3044f0\\]:not(.mesa-frame){background-color:rgb(${sr} ${sg} ${sb}) !important}`);
+    css.push(
+      `html:not([data-mesa-mode="dark"]) .mesa-paper.bg-\\[\\#f6f5f0\\],html:not([data-mesa-mode="dark"]) .mesa-paper .bg-\\[\\#f6f5f0\\]{background-color:rgb(${lr} ${lg} ${lb}) !important}`
+    );
     css.push(
       `html[data-mesa-mode="dark"] .mesa-paper.bg-\\[\\#f6f5f0\\],html[data-mesa-mode="dark"] .mesa-paper .bg-\\[\\#f6f5f0\\]{background-color:rgb(${pr} ${pg} ${pb}) !important}`
     );

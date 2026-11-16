@@ -279,7 +279,13 @@ export function DocumentSheet() {
                 </div>
               </>
             ) : screenShare ? (
-              <div className="w-full flex-1 bg-[#3044f0] flex flex-col items-center justify-center gap-4 p-8 text-center">
+              <div
+                onDoubleClick={() => {
+                  watchScreen(screenShare.user.id);
+                  toggleFullscreen();
+                }}
+                className="w-full flex-1 bg-[#3044f0] flex flex-col items-center justify-center gap-4 p-8 text-center"
+              >
                 <Monitor className="w-10 h-10 text-[#ffd027]" />
                 <h3 className="mesa-display text-2xl text-white" data-testid="screen-share-offer">
                   {screenSharers.length > 1 ? `${screenSharers.length} pessoas estão compartilhando a tela` : `${screenShare.user.name} está compartilhando a tela`}
