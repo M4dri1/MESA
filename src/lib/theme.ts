@@ -244,7 +244,7 @@ function buildOverrideCss(p: Params): string {
     css.push(
       `.mesa-chat-panel,html[data-mesa-mode="dark"] .mesa-chat-panel,.mesa-chat-panel form,html[data-mesa-mode="dark"] .mesa-chat-panel form,.mesa-chat-panel [class*="bg-[#f6f5f0]"],html[data-mesa-mode="dark"] .mesa-chat-panel [class*="bg-[#f6f5f0]"]{background-color:rgb(${br} ${bg} ${bb}) !important;color:${bodyHex} !important}`,
       `.mesa-chat-panel .bg-white,html[data-mesa-mode="dark"] .mesa-chat-panel .bg-white{background-color:rgb(${cr} ${cg} ${cb}) !important;color:${titleHex} !important}`,
-      `.mesa-chat-panel [class*="bg-slate-900/"]{background-color:${subtleBg} !important}`,
+      `.mesa-chat-panel .bg-slate-900\\/5,.mesa-chat-panel .bg-slate-900\\/10,.mesa-chat-panel .hover\\:bg-slate-900\\/5:hover,.mesa-chat-panel .hover\\:bg-slate-900\\/10:hover{background-color:${subtleBg} !important}`,
       `.mesa-chat-panel [class*="border-slate-900/"]{border-color:${borderRgba} !important}`,
       `.mesa-chat-panel [class*="text-slate-9"],html[data-mesa-mode="dark"] .mesa-chat-panel [class*="text-slate-9"]{color:${titleHex} !important}`,
       `.mesa-chat-panel [class*="text-slate-8"],.mesa-chat-panel [class*="text-slate-7"],html[data-mesa-mode="dark"] .mesa-chat-panel [class*="text-slate-8"],html[data-mesa-mode="dark"] .mesa-chat-panel [class*="text-slate-7"]{color:${bodyHex} !important}`,

@@ -25,6 +25,7 @@ export function ChatPicker({ onEmoji, onClose }: { onEmoji: (emoji: string) => v
   const [query, setQuery] = useState('');
   const [gifs, setGifs] = useState<GifResult[]>([]);
   const [gifState, setGifState] = useState<'idle' | 'loading' | 'error' | 'needsKey'>('idle');
+  const [gifProvider, setGifProvider] = useState<'klipy' | 'giphy' | null>(null);
   const [gifError, setGifError] = useState('');
   const requestRef = useRef(0);
 
@@ -43,9 +44,11 @@ export function ChatPicker({ onEmoji, onClose }: { onEmoji: (emoji: string) => v
       if (id !== requestRef.current) return;
       if (result.ok) {
         setGifs(result.gifs);
+        setGifProvider(result.provider || null);
         setGifState('idle');
       } else {
         setGifs([]);
+        setGifProvider(null);
         setGifError(result.error || 'Não foi possível buscar GIFs.');
         setGifState(result.needsKey ? 'needsKey' : 'error');
       }
@@ -171,7 +174,9 @@ export function ChatPicker({ onEmoji, onClose }: { onEmoji: (emoji: string) => v
               </div>
             )}
           </div>
-          <p className="px-2 py-1 text-[10px] text-slate-500 text-right border-t border-slate-900/10 flex-shrink-0">GIFs via Klipy / GIPHY</p>
+          <p className="px-2 py-1 text-[10px] text-slate-500 text-right border-t border-slate-900/10 flex-shrink-0">
+            {gifProvider === 'klipy' ? 'Powered by KLIPY' : gifProvider === 'giphy' ? 'Powered by GIPHY' : 'GIFs via Klipy / GIPHY'}
+          </p>
         </div>
       )}
 

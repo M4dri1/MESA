@@ -708,11 +708,11 @@ export function ChatAndMaterialsPanel() {
       )}
 
       {/* Panel Top Tabs (Discord / SaaS style) */}
-      <div className="flex items-center gap-2 border-b border-slate-900/10 px-3 md:px-4 pt-3 pb-2">
-        <div className="flex flex-1 items-center gap-3 md:gap-4 min-w-0 overflow-x-auto no-scrollbar">
+      <div className="flex items-center gap-1.5 border-b border-slate-900/10 px-2.5 md:px-3 pt-3 pb-2">
+        <div className="flex flex-1 items-center gap-2 md:gap-2.5 min-w-0 overflow-x-auto no-scrollbar">
           <button
             onClick={() => setActiveTab('chat')}
-            className={`relative flex-shrink-0 pb-2 text-xs md:text-sm font-bold whitespace-nowrap transition-colors ${
+            className={`relative flex-shrink-0 pb-2 text-xs font-bold whitespace-nowrap transition-colors ${
               activeTab === 'chat' ? 'text-slate-900' : 'text-slate-500 hover:text-slate-800'
             }`}
           >
@@ -735,7 +735,7 @@ export function ChatAndMaterialsPanel() {
 
           <button
             onClick={() => setActiveTab('materials')}
-            className={`relative flex-shrink-0 pb-2 text-xs md:text-sm font-bold whitespace-nowrap flex items-center gap-1.5 transition-colors ${
+            className={`relative flex-shrink-0 pb-2 text-xs font-bold whitespace-nowrap flex items-center gap-1 transition-colors ${
               activeTab === 'materials' ? 'text-slate-900' : 'text-slate-500 hover:text-slate-800'
             }`}
           >
@@ -751,7 +751,7 @@ export function ChatAndMaterialsPanel() {
           <button
             onClick={() => setActiveTab('music')}
             data-testid="tab-music"
-            className={`relative flex-shrink-0 pb-2 text-xs md:text-sm font-bold whitespace-nowrap flex items-center gap-1.5 transition-colors ${
+            className={`relative flex-shrink-0 pb-2 text-xs font-bold whitespace-nowrap flex items-center gap-1 transition-colors ${
               activeTab === 'music' ? 'text-slate-900' : 'text-slate-500 hover:text-slate-800'
             }`}
           >
@@ -766,7 +766,7 @@ export function ChatAndMaterialsPanel() {
           </button>
         </div>
 
-        <div className="flex items-center gap-0.5 flex-shrink-0 pl-2 ml-1 border-l border-slate-900/10 mb-2">
+        <div className="flex items-center gap-0.5 flex-shrink-0 pl-1.5 ml-0.5 border-l border-slate-900/10 mb-2">
           <button
             type="button"
             data-testid="chat-search-toggle"

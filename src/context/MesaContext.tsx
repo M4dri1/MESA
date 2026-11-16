@@ -299,7 +299,7 @@ interface MesaContextType {
   notify: (text: string) => void;
 
   // GIFs e figurinhas
-  searchGifs: (query: string) => Promise<{ ok: boolean; gifs: GifResult[]; error?: string; needsKey?: boolean }>;
+  searchGifs: (query: string) => Promise<{ ok: boolean; gifs: GifResult[]; provider?: 'klipy' | 'giphy'; error?: string; needsKey?: boolean }>;
   sendGif: (url: string) => void;
   stickers: Sticker[];
   createSticker: (file: File) => Promise<boolean>;
@@ -1751,7 +1751,11 @@ export function MesaProvider({ children }: { children: ReactNode }) {
   const searchGifs = async (query: string) => {
     const res = await api(`/api/gifs?q=${encodeURIComponent(query)}`, { token: tokenRef.current });
     if (!res.ok) return { ok: false, gifs: [] as GifResult[], error: res.error, needsKey: !!res.data?.needsKey };
-    return { ok: true, gifs: (res.data.gifs || []) as GifResult[] };
+    return {
+      ok: true,
+      gifs: (res.data.gifs || []) as GifResult[],
+      provider: res.data.provider === 'klipy' || res.data.provider === 'giphy' ? res.data.provider : undefined,
+    };
   };
 
   const sendToChat = (payload: Record<string, unknown>) => {
