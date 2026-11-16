@@ -27,6 +27,7 @@ import {
   Music2,
   Play,
   Search,
+  Lock,
 } from 'lucide-react';
 import { MusicPanel, MusicStrip } from './MusicPanel';
 import { User } from '@/types';
@@ -866,6 +867,15 @@ export function ChatAndMaterialsPanel() {
                 >
                   Voltar às mais recentes
                 </button>
+              </div>
+            )}
+            {!filtering && (
+              <div
+                data-testid="e2ee-badge"
+                className="flex items-center justify-center gap-1.5 rounded-xl bg-slate-900/[0.04] px-3 py-1.5 text-[11px] font-medium text-slate-600"
+              >
+                <Lock className="w-3 h-3 flex-shrink-0 text-emerald-600" />
+                <span>Mensagens e chamadas protegidas com criptografia ponta a ponta</span>
               </div>
             )}
             {shownMessages.map((msg) => {

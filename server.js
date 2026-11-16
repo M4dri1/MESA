@@ -51,32 +51,123 @@ const SUBJECTS = [
 const AVATAR_COLORS = ['#2563eb', '#db2777', '#7c3aed', '#059669', '#d97706', '#0891b2', '#dc2626', '#4f46e5'];
 
 /* ------------------------------------------------------------------ */
-/* Banco de dados em arquivo                                           */
+/* Criptografia em repouso (AES-256-GCM) e Banco de dados em arquivo  */
 /* ------------------------------------------------------------------ */
 
 fs.mkdirSync(UPLOAD_DIR, { recursive: true });
+
+const KEY_DIR = path.join(__dirname, 'key');
+const MASTER_KEY_FILE = path.join(KEY_DIR, 'master.key');
+const ENC_PREFIX = 'enc:v1:';
+const SESSION_TTL_MS = 30 * 24 * 60 * 60 * 1000; // 30 dias
+
+function loadOrCreateMasterKey() {
+  if (process.env.MESA_MASTER_KEY) {
+    return crypto.createHash('sha256').update(String(process.env.MESA_MASTER_KEY)).digest();
+  }
+  try {
+    fs.mkdirSync(KEY_DIR, { recursive: true });
+    if (fs.existsSync(MASTER_KEY_FILE)) {
+      const hex = fs.readFileSync(MASTER_KEY_FILE, 'utf8').trim();
+      if (/^[0-9a-fA-F]{64}$/.test(hex)) return Buffer.from(hex, 'hex');
+    }
+    const key = crypto.randomBytes(32);
+    fs.writeFileSync(MASTER_KEY_FILE, key.toString('hex'), { mode: 0o600 });
+    return key;
+  } catch {
+    return crypto.createHash('sha256').update(__dirname).digest();
+  }
+}
+
+const MASTER_KEY = loadOrCreateMasterKey();
+
+function sealText(plain) {
+  if (typeof plain !== 'string' || !plain || plain.startsWith(ENC_PREFIX)) return plain;
+  const iv = crypto.randomBytes(12);
+  const cipher = crypto.createCipheriv('aes-256-gcm', MASTER_KEY, iv);
+  const encrypted = Buffer.concat([cipher.update(plain, 'utf8'), cipher.final()]);
+  const tag = cipher.getAuthTag();
+  return `${ENC_PREFIX}${iv.toString('hex')}:${tag.toString('hex')}:${encrypted.toString('base64')}`;
+}
+
+function openText(sealed) {
+  if (typeof sealed !== 'string' || !sealed.startsWith(ENC_PREFIX)) return sealed;
+  try {
+    const parts = sealed.slice(ENC_PREFIX.length).split(':');
+    if (parts.length !== 3) return sealed;
+    const iv = Buffer.from(parts[0], 'hex');
+    const tag = Buffer.from(parts[1], 'hex');
+    const data = Buffer.from(parts[2], 'base64');
+    const decipher = crypto.createDecipheriv('aes-256-gcm', MASTER_KEY, iv);
+    decipher.setAuthTag(tag);
+    return Buffer.concat([decipher.update(data), decipher.final()]).toString('utf8');
+  } catch {
+    return sealed;
+  }
+}
+
+function decryptDbInPlace(target) {
+  for (const room of target.rooms || []) {
+    room.e2eKey = openText(room.e2eKey) || crypto.randomBytes(32).toString('hex');
+  }
+  for (const list of Object.values(target.messages || {})) {
+    if (!Array.isArray(list)) continue;
+    for (const msg of list) {
+      if (msg && typeof msg.content === 'string') msg.content = openText(msg.content);
+    }
+  }
+  for (const [roomId, note] of Object.entries(target.notes || {})) {
+    if (typeof note === 'string') target.notes[roomId] = openText(note);
+  }
+}
+
+function serializeEncryptedDb(source) {
+  const sealedRooms = (source.rooms || []).map((r) => ({
+    ...r,
+    e2eKey: sealText(r.e2eKey || ''),
+  }));
+  const sealedMessages = {};
+  for (const [roomId, list] of Object.entries(source.messages || {})) {
+    sealedMessages[roomId] = (list || []).map((m) => ({
+      ...m,
+      content: sealText(m.content || ''),
+    }));
+  }
+  const sealedNotes = {};
+  for (const [roomId, note] of Object.entries(source.notes || {})) {
+    sealedNotes[roomId] = sealText(String(note || ''));
+  }
+  return JSON.stringify({
+    ...source,
+    rooms: sealedRooms,
+    messages: sealedMessages,
+    notes: sealedNotes,
+  });
+}
 
 let db = { users: [], sessions: {}, rooms: [], messages: {}, materials: {}, notes: {}, files: {}, boards: {}, pomodoro: {}, stickers: {}, sounds: {} };
 try {
   if (fs.existsSync(DB_FILE)) {
     db = Object.assign(db, JSON.parse(fs.readFileSync(DB_FILE, 'utf8')));
+    decryptDbInPlace(db);
   }
 } catch (err) {
   console.error('Não foi possível ler data/db.json:', err.message);
   process.exit(1);
 }
 
-// Salas criadas antes da moderação existir ganham os campos novos
+// Salas criadas antes da moderação e E2EE existirem ganham os campos novos
 for (const room of db.rooms) {
   room.adminIds = room.adminIds || [];
   room.bans = room.bans || {};
   room.timeouts = room.timeouts || {};
+  room.e2eKey = room.e2eKey || crypto.randomBytes(32).toString('hex');
 }
 
 let saveTimer = null;
 function saveNow() {
   saveTimer = null;
-  const data = JSON.stringify(db);
+  const data = serializeEncryptedDb(db);
   const tmp = DB_FILE + '.tmp';
   try {
     fs.writeFileSync(tmp, data);
@@ -132,8 +223,14 @@ function createSession(userId) {
 }
 function userFromToken(token) {
   if (!token) return null;
-  const session = db.sessions[hashToken(token)];
+  const key = hashToken(token);
+  const session = db.sessions[key];
   if (!session) return null;
+  if (session.createdAt && Date.now() - session.createdAt > SESSION_TTL_MS) {
+    delete db.sessions[key];
+    save();
+    return null;
+  }
   return db.users.find((u) => u.id === session.userId) || null;
 }
 const findUser = (id) => db.users.find((u) => u.id === id) || null;
@@ -476,7 +573,7 @@ function memberDto(userId, roomId) {
   };
 }
 
-function roomDto(room, viewerId) {
+function roomDto(room, viewerId, includeSecret = false) {
   const members = [...callOf(room.id).keys()].map((id) => memberDto(id, room.id)).filter(Boolean);
   return {
     id: room.id,
@@ -494,6 +591,7 @@ function roomDto(room, viewerId) {
     adminIds: room.adminIds || [],
     myRole: roleOf(room, viewerId),
     myPunishedUntil: punishedUntil(room, viewerId),
+    ...(includeSecret ? { e2eKey: room.e2eKey } : {}),
     // Só quem modera enxerga a lista de expulsos
     bans:
       RANK[roleOf(room, viewerId)] >= RANK.admin
@@ -771,9 +869,24 @@ function setAuthCookie(req, res, token) {
   const isHttps = req.socket?.encrypted || String(req.headers['x-forwarded-proto'] || '').split(',')[0].trim() === 'https';
   const secure = isHttps ? '; Secure' : '';
   const value = token
-    ? `mesa_token=${encodeURIComponent(token)}; Path=/; Max-Age=31536000; SameSite=Lax${secure}`
-    : `mesa_token=; Path=/; Max-Age=0; SameSite=Lax${secure}`;
+    ? `mesa_token=${encodeURIComponent(token)}; Path=/; HttpOnly; Max-Age=2592000; SameSite=Lax${secure}`
+    : `mesa_token=; Path=/; HttpOnly; Max-Age=0; SameSite=Lax${secure}`;
   res.setHeader('Set-Cookie', value);
+}
+
+function setSecurityHeaders(req, res) {
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.setHeader('X-Frame-Options', 'SAMEORIGIN');
+  res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+  res.setHeader('Permissions-Policy', 'camera=(self), microphone=(self), display-capture=(self), geolocation=()');
+  const isHttps = req.socket?.encrypted || String(req.headers['x-forwarded-proto'] || '').split(',')[0].trim() === 'https';
+  if (isHttps) {
+    res.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
+  }
+  res.setHeader(
+    'Content-Security-Policy',
+    "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://www.youtube.com https://s.ytimg.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' data: https://fonts.gstatic.com; img-src 'self' data: blob: https://i.ytimg.com https://*.giphy.com https://media.tenor.com https://c.tenor.com https://i.imgur.com; media-src 'self' data: blob:; connect-src 'self' ws: wss: https://*.giphy.com; frame-src 'self' https://www.youtube.com https://www.youtube-nocookie.com; worker-src 'self' blob:; object-src 'none'; base-uri 'self'; frame-ancestors 'self'"
+  );
 }
 
 function sameOrigin(req) {
@@ -1535,6 +1648,7 @@ function handleSocketMessage(ws, msg) {
         adminIds: [],
         bans: {},
         timeouts: {},
+        e2eKey: crypto.randomBytes(32).toString('hex'),
         createdAt: new Date().toISOString(),
       };
       db.rooms.push(room);
@@ -1675,7 +1789,7 @@ function handleSocketMessage(ws, msg) {
 
       reply({
         ok: true,
-        room: roomDto(room, user.id),
+        room: roomDto(room, user.id, true),
         participants,
         messages: (db.messages[room.id] || []).slice(-200).map(messageDto),
         materials: db.materials[room.id] || [],
@@ -2070,14 +2184,29 @@ function handleSocketMessage(ws, msg) {
     }
 
     case 'chat:send': {
-      const content = String(msg.content || '').trim().slice(0, 2000);
+      const content = String(msg.content || '').trim().slice(0, 6000);
       if (!content) return;
-      const { mentions, mentionAll } = parseMentions(callRoom, user, content);
+      const isEncrypted = content.startsWith('e2ee:v1:');
+      let mentions = [];
+      let mentionAll = false;
+      if (isEncrypted) {
+        if (Array.isArray(msg.mentions)) {
+          const allowed = new Set(callRoom.memberIds.filter((id) => id !== user.id));
+          mentions = msg.mentions.filter((id) => typeof id === 'string' && allowed.has(id)).slice(0, 20);
+        }
+        if (msg.mentionAll && RANK[roleOf(callRoom, user.id)] >= RANK.admin) {
+          mentionAll = true;
+        }
+      } else {
+        const parsed = parseMentions(callRoom, user, content);
+        mentions = parsed.mentions;
+        mentionAll = parsed.mentionAll;
+      }
       addMessage(roomId, user.id, content, undefined, mentions.length || mentionAll ? { mentions, mentionAll } : undefined);
 
       // Quem foi marcado mas não está nesta chamada (outra sala, tela inicial) recebe o aviso mesmo assim
       const targets = mentionAll ? callRoom.memberIds.filter((id) => id !== user.id) : mentions;
-      const preview = content.length > 80 ? `${content.slice(0, 77)}...` : content;
+      const preview = isEncrypted ? '🔒 Nova mensagem criptografada' : content.length > 80 ? `${content.slice(0, 77)}...` : content;
       for (const userId of targets) {
         if (callOf(roomId).has(userId)) continue;
         sendToUser(userId, { type: 'mention', roomId, roomName: callRoom.name, from: user.nickname, preview });
@@ -2216,6 +2345,7 @@ app.prepare().then(() => {
   const upgradeHandler = app.getUpgradeHandler();
 
   const server = http.createServer((req, res) => {
+    setSecurityHeaders(req, res);
     const url = new URL(req.url, 'http://localhost');
     if (url.pathname.startsWith('/api/')) {
       handleApi(req, res, url).catch((err) => {

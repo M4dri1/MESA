@@ -35,6 +35,7 @@ import { StreamAudio } from '@/components/common/StreamVideo';
 import { playClip, preloadClip } from '@/utils/soundpadPlayer';
 import { comboFromEvent } from '@/utils/hotkeys';
 import { translateString } from '@/lib/i18n';
+import { encryptRoomText, decryptRoomText } from '@/utils/e2ee';
 
 export interface AuthResult {
   success: boolean;
@@ -1083,11 +1084,18 @@ export function MesaProvider({ children }: { children: ReactNode }) {
   };
 
   /* ---------------- Salas ---------------- */
-  const mapMessage = (m: any): ChatMessage => ({
-    ...m,
-    timestamp: formatTime(m.ts || Date.now()),
-    isMe: m.senderId === userRef.current.id,
-  });
+  const roomKeysRef = useRef<Map<string, string>>(new Map());
+
+  const mapMessage = (m: any): ChatMessage => {
+    const secret = roomKeysRef.current.get(m.roomId);
+    const content = m.senderId === 'system' ? m.content : decryptRoomText(m.roomId, secret, m.content || '');
+    return {
+      ...m,
+      content,
+      timestamp: formatTime(m.ts || Date.now()),
+      isMe: m.senderId === userRef.current.id,
+    };
+  };
   const mapMaterial = (m: any): StudyMaterial => ({
     ...m,
     uploadedAt: new Date(m.ts || Date.now()).toLocaleDateString('pt-BR'),
@@ -1149,6 +1157,7 @@ export function MesaProvider({ children }: { children: ReactNode }) {
 
     teardownPeers();
     roomIdRef.current = roomId;
+    if (res.room?.e2eKey) roomKeysRef.current.set(roomId, res.room.e2eKey);
     setCurrentRoomIdState(roomId);
     setEnteredRoom(res.room);
     setParticipants(res.participants || []);
@@ -1164,7 +1173,7 @@ export function MesaProvider({ children }: { children: ReactNode }) {
       return next;
     });
     setAllMaterials((prev) => ({ ...prev, [roomId]: (res.materials || []).map(mapMaterial) }));
-    setRoomNotes((prev) => ({ ...prev, [roomId]: res.notes || '' }));
+    setRoomNotes((prev) => ({ ...prev, [roomId]: decryptRoomText(roomId, res.room?.e2eKey, res.notes || '') }));
     setBoardStrokes(res.board || []);
     setMyPunishedUntil(res.room.myPunishedUntil || 0);
     punishedRef.current = isActiveUntil(res.room.myPunishedUntil);
@@ -1221,9 +1230,36 @@ export function MesaProvider({ children }: { children: ReactNode }) {
 
   /* ---------------- Chat, materiais, anotações ---------------- */
   const sendMessage = (content: string) => {
-    if (!roomIdRef.current || !content.trim()) return;
+    const roomId = roomIdRef.current;
+    if (!roomId || !content.trim()) return;
     if (punishedRef.current) return punishedNotice();
-    if (wsSend({ type: 'chat:send', content: content.trim() })) playMessageSentSound();
+    const trimmed = content.trim();
+    const byNick = new Map<string, string>();
+    participants.forEach((p) => byNick.set(p.name.trim().normalize('NFKC').toLowerCase(), p.id));
+    Object.values(friends).forEach((f) => byNick.set(f.name.trim().normalize('NFKC').toLowerCase(), f.id));
+    const mentions = new Set<string>();
+    let mentionAll = false;
+    const re = /@([^\s@]{2,20})/g;
+    let match: RegExpExecArray | null;
+    while ((match = re.exec(trimmed))) {
+      let candidate = match[1].trim().normalize('NFKC').toLowerCase();
+      if (candidate === 'todos' || candidate === 'everyone') {
+        mentionAll = true;
+        continue;
+      }
+      while (candidate.length >= 3) {
+        if (byNick.has(candidate)) {
+          mentions.add(byNick.get(candidate)!);
+          break;
+        }
+        const stripped = candidate.replace(/[._-]+$/, '');
+        if (stripped === candidate) break;
+        candidate = stripped;
+      }
+    }
+    mentions.delete(userRef.current.id);
+    const encrypted = encryptRoomText(roomId, roomKeysRef.current.get(roomId), trimmed);
+    if (wsSend({ type: 'chat:send', content: encrypted, mentions: Array.from(mentions), mentionAll })) playMessageSentSound();
     else showNotice('Sem conexão com o servidor. A mensagem não foi enviada.');
   };
 
@@ -1304,7 +1340,8 @@ export function MesaProvider({ children }: { children: ReactNode }) {
     setRoomNotes((prev) => ({ ...prev, [roomId]: notes }));
     if (roomId !== roomIdRef.current) return;
     if (notesTimerRef.current) window.clearTimeout(notesTimerRef.current);
-    notesTimerRef.current = window.setTimeout(() => wsSend({ type: 'notes:update', text: notes }), 300);
+    const encrypted = encryptRoomText(roomId, roomKeysRef.current.get(roomId), notes);
+    notesTimerRef.current = window.setTimeout(() => wsSend({ type: 'notes:update', text: encrypted }), 300);
   };
 
   const inviteFriend = (friendId: string) => {
@@ -1924,7 +1961,8 @@ export function MesaProvider({ children }: { children: ReactNode }) {
         return;
       }
       case 'notes': {
-        setRoomNotes((prev) => ({ ...prev, [msg.roomId]: msg.text }));
+        const decrypted = decryptRoomText(msg.roomId, roomKeysRef.current.get(msg.roomId), msg.text || '');
+        setRoomNotes((prev) => ({ ...prev, [msg.roomId]: decrypted }));
         return;
       }
       case 'pomodoro': {

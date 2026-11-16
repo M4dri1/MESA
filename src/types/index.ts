@@ -128,6 +128,8 @@ export interface Room {
   myRole?: RoomRole;
   myPunishedUntil?: number;
   bans?: RoomBan[];
+  /** Chave de 256 bits da sala para criptografia ponta a ponta (entregue apenas a membros autorizados) */
+  e2eKey?: string;
   screenSharer?: string;
   currentDocument?: string;
   customUploadedFile?: {
