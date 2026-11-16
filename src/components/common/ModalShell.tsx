@@ -2,7 +2,6 @@
 
 import React from 'react';
 import { X } from 'lucide-react';
-import { Sparkle } from './Sparkle';
 
 interface ModalShellProps {
   title: string;
@@ -26,10 +25,6 @@ export function ModalShell({ title, subtitle, onClose, width = 'max-w-3xl', asid
       <div className={`mesa-paper relative w-full ${width} max-h-[94vh] overflow-hidden rounded-3xl flex flex-col md:flex-row shadow-[0_40px_80px_-24px_rgba(0,0,0,0.7)]`}>
         {/* Metade cobalto */}
         <div className="relative flex-shrink-0 md:w-[310px] bg-[#3044f0] text-white p-5 md:p-8 flex flex-col justify-between gap-6 overflow-hidden">
-          <Sparkle className="right-6 top-[38%] h-5 w-5 text-[#ffd027] hidden md:block" />
-          <Sparkle className="right-10 bottom-6 h-3 w-3 text-white/45 hidden md:block" />
-          <Sparkle className="right-14 top-5 h-3.5 w-3.5 text-[#ffd027] md:hidden" />
-
           <div className="relative space-y-5 md:space-y-8">
             <span className="flex items-center gap-2.5">
               <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-[#ffd027] text-base font-black text-[#0b0f19]">M</span>

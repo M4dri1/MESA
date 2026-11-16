@@ -28,7 +28,6 @@ import {
 import { Avatar } from '@/components/common/Avatar';
 import { ImagePickerModal } from '@/components/common/ImagePickerModal';
 import { mediaTransformStyle } from '@/utils/mediaTransform';
-import { Sparkle } from '@/components/common/Sparkle';
 import { RoleBadge } from '@/components/modals/ParticipantModal';
 import { isActiveUntil, untilLabel, MUSIC_BOT_ID } from '@/context/MesaContext';
 
@@ -164,9 +163,6 @@ export function SidebarLeft() {
             className="relative p-4 pb-5 overflow-hidden"
             style={{ backgroundColor: /^#[0-9a-f]{6}$/i.test(currentRoom.color || '') ? currentRoom.color : '#2563eb' }}
           >
-            <Sparkle className="right-4 bottom-4 h-4 w-4 text-white/55" />
-            <Sparkle className="right-12 top-3 h-2.5 w-2.5 text-white/40" />
-
             <div className="flex items-start justify-between gap-2">
               {/* Foto da sala: dono e adm podem trocar */}
               <div className="relative flex-shrink-0">

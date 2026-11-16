@@ -3,7 +3,6 @@
 import React, { useState } from 'react';
 import { useMesa } from '@/context/MesaContext';
 import { Avatar } from '@/components/common/Avatar';
-import { Sparkle } from '@/components/common/Sparkle';
 import { Copy, Check } from 'lucide-react';
 import { playSuccessSound } from '@/utils/soundEffects';
 
@@ -86,7 +85,6 @@ export function SidebarRightFriends() {
 
       {/* Convite: um bloco cobalto, como a metade azul do login */}
       <div className="relative overflow-hidden bg-[#3044f0] text-white p-4 rounded-2xl mt-6 flex-shrink-0">
-        <Sparkle className="right-3 top-3 h-5 w-5 text-[#ffd027]" />
         <div className="relative z-10 space-y-2">
           <h4 className="landing-display text-base text-white">Chame um amigo</h4>
           <p className="text-xs text-white/85 leading-snug pr-4">

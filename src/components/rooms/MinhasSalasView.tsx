@@ -3,7 +3,6 @@
 import React, { useState } from 'react';
 import { useMesa } from '@/context/MesaContext';
 import { RoomCard } from '@/components/rooms/RoomCard';
-import { Sparkle } from '@/components/common/Sparkle';
 import { Room } from '@/types';
 import { Plus, Hash, BookOpen } from 'lucide-react';
 
@@ -23,10 +22,6 @@ export function MinhasSalasView() {
 
   return (
     <div className="relative flex-1 min-w-0 flex flex-col h-full overflow-y-auto px-5 md:px-10 pt-3 pb-12">
-      <Sparkle className="right-[6%] top-6 h-7 w-7 md:h-9 md:w-9 text-[#ffd027]" />
-      <Sparkle className="hidden md:block right-[22%] top-24 h-4 w-4 text-white/50" />
-      <Sparkle className="hidden md:block left-[46%] top-3 h-3 w-3 text-white/40" />
-
       <div className="relative w-full space-y-8">
         {/* Cabeçalho: o mesmo título largo da tela inicial */}
         <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-6">
