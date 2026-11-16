@@ -32,6 +32,7 @@ export function StudyRoomView() {
     callFocus,
     setCallFocus,
     isChatPanelOpen,
+    toggleChatPanel,
     setIsInviteModalOpen,
     isConnected,
     isPunished,
@@ -40,6 +41,14 @@ export function StudyRoomView() {
 
   const [secondsElapsed, setSecondsElapsed] = useState(0);
   const [mobilePanel, setMobilePanel] = useState<'study' | 'chat'>('study');
+
+  const handleToggleChat = () => {
+    if (typeof window !== 'undefined' && window.innerWidth < 768) {
+      setMobilePanel((prev) => (prev === 'chat' ? 'study' : 'chat'));
+    } else {
+      toggleChatPanel();
+    }
+  };
 
   useEffect(() => {
     const timer = setInterval(() => {
@@ -216,19 +225,15 @@ export function StudyRoomView() {
         {/* Bottom Floating Control Bar */}
         <ControlBar
           showChatToggle={true}
-          onToggleChat={() => setMobilePanel('chat')}
+          onToggleChat={handleToggleChat}
         />
       </div>
 
       {/* Right Column: Chat and Materials (Slide 8 & 11) */}
       <div
         className={`h-full md:rounded-3xl overflow-hidden transition-all ${
-          mobilePanel === 'study'
-            ? isChatPanelOpen
-              ? 'hidden md:flex'
-              : 'hidden'
-            : 'flex w-full md:w-auto'
-        }`}
+          mobilePanel === 'chat' ? 'flex w-full md:w-auto' : 'hidden'
+        } ${isChatPanelOpen ? 'md:flex' : 'md:hidden'}`}
       >
         {/* On mobile, provide a back to stage button */}
         {mobilePanel === 'chat' && (

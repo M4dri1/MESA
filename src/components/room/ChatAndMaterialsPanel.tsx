@@ -118,6 +118,8 @@ export function ChatAndMaterialsPanel() {
     deleteMessage,
     unread,
     setChatVisible,
+    isChatPanelOpen,
+    toggleChatPanel,
   } = useMesa();
 
   const [activeTab, setActiveTab] = useState<'chat' | 'materials' | 'music'>('chat');
@@ -528,7 +530,7 @@ export function ChatAndMaterialsPanel() {
       document.removeEventListener('visibilitychange', update);
       setVisibleRef.current(false);
     };
-  }, [activeTab]);
+  }, [activeTab, isChatPanelOpen]);
 
   // Pessoas da sala que dá para marcar (menos eu)
   const roomPeople: User[] = (() => {
@@ -793,6 +795,15 @@ export function ChatAndMaterialsPanel() {
             className="p-1.5 text-slate-500 hover:text-[#3044f0] rounded-lg hover:bg-slate-900/5 transition-colors"
           >
             <Upload className="w-4 h-4" />
+          </button>
+          {/* Minimize chat panel on desktop */}
+          <button
+            type="button"
+            onClick={toggleChatPanel}
+            title="Ocultar chat e materiais"
+            className="hidden md:inline-flex p-1.5 text-slate-500 hover:text-slate-900 rounded-lg hover:bg-slate-900/5 transition-colors"
+          >
+            <X className="w-4 h-4" />
           </button>
         </div>
       </div>
