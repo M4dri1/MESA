@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react';
 import { useMesa } from '@/context/MesaContext';
-import { Volume2, VolumeX, LogOut, UserPlus, SlidersHorizontal, ChevronDown } from 'lucide-react';
+import { Volume2, VolumeX, LogOut, UserPlus, SlidersHorizontal, ChevronDown, Users } from 'lucide-react';
 import { PRESENCE_OPTIONS } from '@/components/common/PresenceSettings';
 import { Avatar } from '@/components/common/Avatar';
 import { mediaTransformStyle } from '@/utils/mediaTransform';
@@ -21,10 +21,16 @@ export function TopNavigation() {
     presence,
     setPresence,
     openSettings,
+    setIsFriendsDrawerOpen,
+    friendRequests,
+    dmUnread,
   } = useMesa();
 
   const [showUserMenu, setShowUserMenu] = useState(false);
   const presenceOption = PRESENCE_OPTIONS.find((o) => o.id === presence);
+  const friendsBadge =
+    (friendRequests?.incoming?.length || 0) +
+    Object.values(dmUnread || {}).reduce((acc, n) => acc + n, 0);
 
   return (
     <header className="h-16 px-4 md:px-6 flex items-center justify-between flex-shrink-0 select-none z-30">
@@ -46,6 +52,26 @@ export function TopNavigation() {
       </div>
 
       <div className="flex items-center gap-2 sm:gap-3">
+        {/* Amigos (no celular/tablet, ou quando estiver dentro de uma sala) */}
+        {isAuthenticated && (
+          <button
+            type="button"
+            onClick={() => setIsFriendsDrawerOpen(true)}
+            title="Amigos e conversas privadas"
+            className={`relative h-10 px-3.5 rounded-full bg-white/15 hover:bg-white/25 text-white text-xs font-bold flex items-center gap-2 transition-colors ${
+              currentRoom ? 'flex' : 'flex xl:hidden'
+            }`}
+          >
+            <Users className="w-4 h-4" />
+            <span className="hidden lg:inline">Amigos</span>
+            {friendsBadge > 0 && (
+              <span className="min-w-[18px] h-[18px] px-1 rounded-full bg-rose-600 text-white text-[10px] font-extrabold flex items-center justify-center">
+                {friendsBadge}
+              </span>
+            )}
+          </button>
+        )}
+
         {/* Sons do app */}
         <button
           onClick={toggleSoundEffects}

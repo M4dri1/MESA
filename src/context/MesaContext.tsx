@@ -1,7 +1,7 @@
 'use client';
 
 import React, { createContext, useContext, useState, useEffect, useRef, useMemo, ReactNode } from 'react';
-import { Room, User, ChatMessage, StudyMaterial, SubjectType, ChatAttachment, BoardStroke, RoomRole, Sticker, GifResult, MusicState, MusicSearchItem, Presence, NotifyLevel, Sound } from '@/types';
+import { Room, User, ChatMessage, StudyMaterial, SubjectType, ChatAttachment, BoardStroke, RoomRole, Sticker, GifResult, MusicState, MusicSearchItem, Presence, NotifyLevel, Sound, FriendRequest, DirectMessage } from '@/types';
 import {
   playJoinRoomSound,
   playLeaveRoomSound,
@@ -322,6 +322,21 @@ interface MesaContextType {
   isPunished: boolean;
   moderate: (action: ModerationAction, userId: string, duration?: ModerationDuration) => Promise<boolean>;
 
+  // Amigos e mensagens diretas (DM)
+  friendRequests: { incoming: FriendRequest[]; outgoing: FriendRequest[] };
+  sendFriendRequest: (input: { targetId?: string; nickname?: string }) => Promise<{ ok: boolean; accepted?: boolean; error?: string }>;
+  acceptFriendRequest: (requestId: string) => Promise<boolean>;
+  declineFriendRequest: (requestId: string) => Promise<boolean>;
+  removeFriend: (targetId: string) => Promise<boolean>;
+  activeDmFriendId: string | null;
+  dmMessages: Record<string, DirectMessage[]>;
+  dmUnread: Record<string, number>;
+  openDm: (friendId: string) => Promise<void>;
+  closeDm: () => void;
+  sendDm: (friendId: string, content: string, gifUrl?: string) => Promise<{ ok: boolean; error?: string }>;
+  isFriendsDrawerOpen: boolean;
+  setIsFriendsDrawerOpen: (open: boolean) => void;
+
   // Avisos (permissão de mídia, erros, convites)
   mediaNotice: string | null;
   clearMediaNotice: () => void;
@@ -533,6 +548,12 @@ export function MesaProvider({ children }: { children: ReactNode }) {
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [isInviteModalOpen, setIsInviteModalOpen] = useState(false);
   const [isJoinCodeModalOpen, setIsJoinCodeModalOpen] = useState(false);
+  const [isFriendsDrawerOpen, setIsFriendsDrawerOpen] = useState(false);
+  const [friendRequests, setFriendRequests] = useState<{ incoming: FriendRequest[]; outgoing: FriendRequest[] }>({ incoming: [], outgoing: [] });
+  const [activeDmFriendId, setActiveDmFriendId] = useState<string | null>(null);
+  const activeDmFriendIdRef = useRef<string | null>(null);
+  const [dmMessages, setDmMessages] = useState<Record<string, DirectMessage[]>>({});
+  const [dmUnread, setDmUnread] = useState<Record<string, number>>({});
   const [soundActive, setSoundActive] = useState(true);
 
   /* ---------------- Referências (valores usados dentro de callbacks) ---------------- */
@@ -1945,6 +1966,22 @@ export function MesaProvider({ children }: { children: ReactNode }) {
         const map: Record<string, User> = {};
         for (const person of msg.people || []) map[person.id] = person;
         setFriends(map);
+        if (msg.friendRequests) setFriendRequests(msg.friendRequests);
+        return;
+      }
+      case 'dm:new': {
+        const peerId = String(msg.peerId || '');
+        const dm = msg.message as DirectMessage | undefined;
+        if (!peerId || !dm) return;
+        setDmMessages((prev) => {
+          const list = prev[peerId] || [];
+          if (list.some((m) => m.id === dm.id)) return prev;
+          return { ...prev, [peerId]: [...list, dm].slice(-150) };
+        });
+        if (dm.senderId !== userRef.current.id && activeDmFriendIdRef.current !== peerId) {
+          setDmUnread((prev) => ({ ...prev, [peerId]: (prev[peerId] || 0) + 1 }));
+          playMessageReceivedSound();
+        }
         return;
       }
       case 'peer:joined': {
@@ -2610,6 +2647,63 @@ export function MesaProvider({ children }: { children: ReactNode }) {
         friends,
         invitedFriends,
         inviteFriend,
+        friendRequests,
+        sendFriendRequest: async (input: { targetId?: string; nickname?: string }) => {
+          const res = await request('friend:request', input);
+          if (!res.ok) return { ok: false, error: res.error || 'Não foi possível enviar o pedido.' };
+          playSuccessSound();
+          return { ok: true, accepted: !!res.accepted };
+        },
+        acceptFriendRequest: async (requestId: string) => {
+          const res = await request('friend:accept', { requestId });
+          if (!res.ok) { showNotice(res.error || 'Não foi possível aceitar.'); return false; }
+          playSuccessSound();
+          return true;
+        },
+        declineFriendRequest: async (requestId: string) => {
+          const res = await request('friend:decline', { requestId });
+          if (!res.ok) { showNotice(res.error || 'Não foi possível recusar.'); return false; }
+          return true;
+        },
+        removeFriend: async (targetId: string) => {
+          const res = await request('friend:remove', { targetId });
+          if (!res.ok) { showNotice(res.error || 'Não foi possível remover.'); return false; }
+          if (activeDmFriendIdRef.current === targetId) {
+            activeDmFriendIdRef.current = null;
+            setActiveDmFriendId(null);
+          }
+          return true;
+        },
+        activeDmFriendId,
+        dmMessages,
+        dmUnread,
+        openDm: async (friendId: string) => {
+          activeDmFriendIdRef.current = friendId;
+          setActiveDmFriendId(friendId);
+          setIsFriendsDrawerOpen(false);
+          setDmUnread((prev) => {
+            if (!prev[friendId]) return prev;
+            const next = { ...prev };
+            delete next[friendId];
+            return next;
+          });
+          const res = await request('dm:history', { friendId });
+          if (res.ok) {
+            setDmMessages((prev) => ({ ...prev, [friendId]: (res.messages || []) as DirectMessage[] }));
+          }
+        },
+        closeDm: () => {
+          activeDmFriendIdRef.current = null;
+          setActiveDmFriendId(null);
+        },
+        sendDm: async (friendId: string, content: string, gifUrl?: string) => {
+          const res = await request('dm:send', { friendId, content, ...(gifUrl ? { gifUrl } : {}) });
+          if (!res.ok) return { ok: false, error: res.error || 'Não foi possível enviar.' };
+          playMessageSentSound();
+          return { ok: true };
+        },
+        isFriendsDrawerOpen,
+        setIsFriendsDrawerOpen,
 
         isCreateModalOpen,
         setIsCreateModalOpen,

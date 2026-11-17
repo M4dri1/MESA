@@ -174,6 +174,12 @@ function decryptDbInPlace(target) {
   for (const [roomId, note] of Object.entries(target.notes || {})) {
     if (typeof note === 'string') target.notes[roomId] = openText(note);
   }
+  for (const list of Object.values(target.dms || {})) {
+    if (!Array.isArray(list)) continue;
+    for (const msg of list) {
+      if (msg && typeof msg.content === 'string') msg.content = openText(msg.content);
+    }
+  }
 }
 
 function serializeEncryptedDb(source) {
@@ -192,16 +198,24 @@ function serializeEncryptedDb(source) {
   for (const [roomId, note] of Object.entries(source.notes || {})) {
     sealedNotes[roomId] = sealText(String(note || ''));
   }
+  const sealedDms = {};
+  for (const [pairKey, list] of Object.entries(source.dms || {})) {
+    sealedDms[pairKey] = (list || []).map((m) => ({
+      ...m,
+      content: sealText(m.content || ''),
+    }));
+  }
   const payload = JSON.stringify({
     ...source,
     rooms: sealedRooms,
     messages: sealedMessages,
     notes: sealedNotes,
+    dms: sealedDms,
   });
   return JSON.stringify({ _sealed: sealText(payload) });
 }
 
-let db = { users: [], sessions: {}, rooms: [], messages: {}, materials: {}, notes: {}, files: {}, boards: {}, pomodoro: {}, stickers: {}, sounds: {} };
+let db = { users: [], sessions: {}, rooms: [], messages: {}, materials: {}, notes: {}, files: {}, boards: {}, pomodoro: {}, stickers: {}, sounds: {}, friends: {}, friendRequests: [], dms: {} };
 try {
   if (fs.existsSync(DB_FILE)) {
     const parsed = JSON.parse(fs.readFileSync(DB_FILE, 'utf8'));
@@ -727,12 +741,52 @@ function currentCallRoom(userId) {
   return null;
 }
 
-// Pessoas que dividem alguma sala com o usuário
-function peopleFor(userId) {
-  const ids = new Set();
-  for (const room of db.rooms) {
-    if (room.memberIds.includes(userId)) room.memberIds.forEach((id) => ids.add(id));
+const dmKey = (a, b) => [String(a), String(b)].sort().join(':');
+const areFriends = (a, b) => Array.isArray(db.friends?.[a]) && db.friends[a].includes(b);
+function addFriendship(a, b) {
+  db.friends = db.friends || {};
+  db.friends[a] = db.friends[a] || [];
+  db.friends[b] = db.friends[b] || [];
+  if (!db.friends[a].includes(b)) db.friends[a].push(b);
+  if (!db.friends[b].includes(a)) db.friends[b].push(a);
+}
+function removeFriendship(a, b) {
+  if (db.friends?.[a]) db.friends[a] = db.friends[a].filter((id) => id !== b);
+  if (db.friends?.[b]) db.friends[b] = db.friends[b].filter((id) => id !== a);
+}
+function dmDto(m) {
+  const sender = findUser(m.senderId);
+  return {
+    id: m.id,
+    senderId: m.senderId,
+    senderName: sender ? sender.nickname : 'Usuário',
+    senderAvatar: sender ? sender.avatar : '?',
+    senderAvatarUrl: sender?.avatarUrl || undefined,
+    senderColor: sender ? sender.avatarColor : '#3044f0',
+    content: m.content || '',
+    gifUrl: m.gifUrl || undefined,
+    createdAt: m.createdAt,
+  };
+}
+function friendRequestsFor(userId) {
+  const list = db.friendRequests || [];
+  const incoming = [];
+  const outgoing = [];
+  for (const req of list) {
+    if (req.toId === userId) {
+      const from = findUser(req.fromId);
+      if (from) incoming.push({ id: req.id, user: publicUser(from), createdAt: req.createdAt });
+    } else if (req.fromId === userId) {
+      const to = findUser(req.toId);
+      if (to) outgoing.push({ id: req.id, user: publicUser(to), createdAt: req.createdAt });
+    }
   }
+  return { incoming, outgoing };
+}
+
+// Amigos adicionados pelo usuário
+function peopleFor(userId) {
+  const ids = new Set(Array.isArray(db.friends?.[userId]) ? db.friends[userId] : []);
   ids.delete(userId);
   return [...ids]
     .map((id) => {
@@ -761,7 +815,7 @@ function sendToUser(userId, payload) {
   if (set) set.forEach((ws) => send(ws, payload));
 }
 function pushState(userId) {
-  sendToUser(userId, { type: 'state', rooms: roomsFor(userId), people: peopleFor(userId) });
+  sendToUser(userId, { type: 'state', rooms: roomsFor(userId), people: peopleFor(userId), friendRequests: friendRequestsFor(userId) });
 }
 function pushStateAll() {
   for (const userId of sockets.keys()) pushState(userId);
@@ -2218,6 +2272,115 @@ function handleSocketMessage(ws, msg) {
       sendToUser(target.id, { type: 'invited', roomId: room.id, roomName: room.name, from: user.nickname });
       pushState(target.id);
       reply({ ok: true });
+      return;
+    }
+
+    case 'friend:request': {
+      const rawNick = String(msg.nickname || '').trim().replace(/^@+/, '');
+      const target = msg.targetId
+        ? findUser(msg.targetId)
+        : rawNick
+        ? db.users.find((u) => u.nickLower === norm(rawNick))
+        : null;
+      if (!target) return fail('Não encontramos ninguém com esse nickname.');
+      if (target.id === user.id) return fail('Você não pode se adicionar como amigo.');
+      if (areFriends(user.id, target.id)) return fail('Vocês já são amigos.');
+      db.friendRequests = db.friendRequests || [];
+      // Se a outra pessoa já mandou pedido antes, aceita na hora
+      const reverseIdx = db.friendRequests.findIndex((r) => r.fromId === target.id && r.toId === user.id);
+      if (reverseIdx >= 0) {
+        db.friendRequests.splice(reverseIdx, 1);
+        addFriendship(user.id, target.id);
+        save();
+        pushState(user.id);
+        pushState(target.id);
+        sendToUser(target.id, { type: 'notice', text: `${user.nickname} aceitou seu pedido de amizade!` });
+        reply({ ok: true, accepted: true });
+        return;
+      }
+      if (db.friendRequests.some((r) => r.fromId === user.id && r.toId === target.id)) {
+        return fail('Você já enviou um pedido de amizade para essa pessoa.');
+      }
+      db.friendRequests.push({ id: makeId('fr'), fromId: user.id, toId: target.id, createdAt: new Date().toISOString() });
+      save();
+      pushState(user.id);
+      pushState(target.id);
+      sendToUser(target.id, { type: 'notice', text: `${user.nickname} enviou um pedido de amizade!` });
+      reply({ ok: true, accepted: false });
+      return;
+    }
+
+    case 'friend:accept': {
+      db.friendRequests = db.friendRequests || [];
+      const idx = db.friendRequests.findIndex((r) => r.id === msg.requestId && r.toId === user.id);
+      if (idx < 0) return fail('Pedido de amizade não encontrado.');
+      const reqItem = db.friendRequests[idx];
+      db.friendRequests.splice(idx, 1);
+      addFriendship(reqItem.fromId, reqItem.toId);
+      save();
+      pushState(reqItem.fromId);
+      pushState(reqItem.toId);
+      sendToUser(reqItem.fromId, { type: 'notice', text: `${user.nickname} aceitou seu pedido de amizade!` });
+      reply({ ok: true });
+      return;
+    }
+
+    case 'friend:decline': {
+      db.friendRequests = db.friendRequests || [];
+      const idx = db.friendRequests.findIndex((r) => r.id === msg.requestId && (r.toId === user.id || r.fromId === user.id));
+      if (idx < 0) return fail('Pedido de amizade não encontrado.');
+      const reqItem = db.friendRequests[idx];
+      db.friendRequests.splice(idx, 1);
+      save();
+      pushState(reqItem.fromId);
+      pushState(reqItem.toId);
+      reply({ ok: true });
+      return;
+    }
+
+    case 'friend:remove': {
+      const target = findUser(msg.targetId);
+      if (!target) return fail('Usuário não encontrado.');
+      removeFriendship(user.id, target.id);
+      save();
+      pushState(user.id);
+      pushState(target.id);
+      reply({ ok: true });
+      return;
+    }
+
+    case 'dm:history': {
+      const friendId = String(msg.friendId || '');
+      if (!areFriends(user.id, friendId)) return fail('Adicione como amigo para conversar no privado.');
+      const list = (db.dms && db.dms[dmKey(user.id, friendId)]) || [];
+      reply({ ok: true, messages: list.slice(-100).map(dmDto) });
+      return;
+    }
+
+    case 'dm:send': {
+      const friendId = String(msg.friendId || '');
+      const friend = findUser(friendId);
+      if (!friend || !areFriends(user.id, friendId)) return fail('Adicione como amigo para conversar no privado.');
+      const content = String(msg.content || '').trim().slice(0, 1500);
+      const gifUrl = msg.gifUrl && isGifMedia(msg.gifUrl) ? String(msg.gifUrl) : '';
+      if (!content && !gifUrl) return fail('Escreva uma mensagem.');
+      db.dms = db.dms || {};
+      const key = dmKey(user.id, friendId);
+      db.dms[key] = db.dms[key] || [];
+      const item = {
+        id: makeId('dm'),
+        senderId: user.id,
+        content,
+        ...(gifUrl ? { gifUrl } : {}),
+        createdAt: new Date().toISOString(),
+      };
+      db.dms[key].push(item);
+      if (db.dms[key].length > 300) db.dms[key].splice(0, db.dms[key].length - 300);
+      save();
+      const dto = dmDto(item);
+      sendToUser(user.id, { type: 'dm:new', peerId: friendId, message: dto });
+      sendToUser(friendId, { type: 'dm:new', peerId: user.id, message: dto });
+      reply({ ok: true, message: dto });
       return;
     }
   }

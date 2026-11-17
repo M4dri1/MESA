@@ -13,6 +13,7 @@ import { RoomSettingsModal } from '@/components/modals/RoomSettingsModal';
 import { InviteModal } from '@/components/modals/InviteModal';
 import { JoinByCodeModal } from '@/components/modals/JoinByCodeModal';
 import { DocumentViewerModal } from '@/components/modals/DocumentViewerModal';
+import { DirectMessageModal } from '@/components/modals/DirectMessageModal';
 import { ParticipantModal } from '@/components/modals/ParticipantModal';
 import { SettingsModal } from '@/components/modals/SettingsModal';
 import { initPrefs } from '@/lib/preferences';
@@ -41,6 +42,7 @@ export function MainApp() {
     setParticipantMenuId,
     roomSettingsId,
     closeRoomSettings,
+    isFriendsDrawerOpen,
   } = useMesa();
 
   // Esc fecha a janela que estiver aberta por cima (uma por vez; as Configurações têm o próprio atalho)
@@ -137,6 +139,8 @@ export function MainApp() {
       <InviteModal />
       <JoinByCodeModal />
       <DocumentViewerModal />
+      <DirectMessageModal />
+      {isAuthenticated && isFriendsDrawerOpen && <SidebarRightFriends asDrawer />}
       <ParticipantModal />
       <SettingsModal />
       <AuthModal />

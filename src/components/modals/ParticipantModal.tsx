@@ -4,7 +4,7 @@ import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { useMesa, isActiveUntil, untilLabel, ModerationDuration, MUSIC_BOT_ID } from '@/context/MesaContext';
 import { RoomRole } from '@/types';
 import { mediaTransformStyle } from '@/utils/mediaTransform';
-import { X, Volume2, VolumeX, Crown, Shield, ShieldOff, Clock, Undo2, Mic, MicOff, ChevronDown, Music2, Power, Maximize2 } from 'lucide-react';
+import { X, Volume2, VolumeX, Crown, Shield, ShieldOff, Clock, Undo2, Mic, MicOff, ChevronDown, Music2, Power, Maximize2, UserPlus, UserCheck, MessageCircle, UserMinus } from 'lucide-react';
 
 const RANK: Record<RoomRole, number> = { owner: 3, admin: 2, member: 1 };
 const ROLE_LABEL: Record<RoomRole, string> = { owner: 'Dono da sala', admin: 'Adm', member: 'Membro' };
@@ -95,6 +95,14 @@ export function ParticipantModal() {
     participantMenuPos,
     setParticipantMenuId,
     currentRoom,
+    currentUser,
+    friends,
+    friendRequests,
+    sendFriendRequest,
+    acceptFriendRequest,
+    declineFriendRequest,
+    removeFriend,
+    openDm,
     peerVolumes,
     setPeerVolume,
     myRole,
@@ -375,6 +383,70 @@ export function ParticipantModal() {
           {member.isMicOn ? <Mic className="w-3.5 h-3.5 text-emerald-600" /> : <MicOff className="w-3.5 h-3.5 text-rose-600" />}
           <span>{member.isMicOn ? 'Microfone ligado' : 'Microfone desligado'}</span>
         </p>
+
+        {member.id !== currentUser.id && (() => {
+          const isFriend = !!friends[member.id];
+          const incomingReq = friendRequests.incoming.find((r) => r.user.id === member.id);
+          const outgoingReq = friendRequests.outgoing.find((r) => r.user.id === member.id);
+          return (
+            <div className="mt-3 flex items-center gap-1.5">
+              {isFriend ? (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      close();
+                      void openDm(member.id);
+                    }}
+                    className="flex-1 flex items-center justify-center gap-1.5 py-2 px-3 rounded-xl bg-[#3044f0] hover:bg-[#2334c9] text-white text-xs font-bold transition-colors"
+                  >
+                    <MessageCircle className="w-3.5 h-3.5" />
+                    <span>Conversar</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => void removeFriend(member.id)}
+                    title="Desfazer amizade"
+                    className="p-2 rounded-xl bg-slate-900/5 hover:bg-rose-600 hover:text-white text-slate-600 transition-colors"
+                  >
+                    <UserMinus className="w-3.5 h-3.5" />
+                  </button>
+                </>
+              ) : incomingReq ? (
+                <button
+                  type="button"
+                  onClick={() => void acceptFriendRequest(incomingReq.id)}
+                  className="w-full flex items-center justify-center gap-1.5 py-2 px-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold transition-colors"
+                >
+                  <UserCheck className="w-3.5 h-3.5" />
+                  <span>Aceitar pedido de amizade</span>
+                </button>
+              ) : outgoingReq ? (
+                <button
+                  type="button"
+                  onClick={() => void declineFriendRequest(outgoingReq.id)}
+                  title="Clique para cancelar o pedido"
+                  className="w-full flex items-center justify-center gap-1.5 py-2 px-3 rounded-xl bg-slate-900/5 hover:bg-slate-900/10 text-slate-700 text-xs font-bold transition-colors"
+                >
+                  <UserCheck className="w-3.5 h-3.5 text-emerald-600" />
+                  <span>Pedido enviado (cancelar)</span>
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={async () => {
+                    const res = await sendFriendRequest({ targetId: member.id });
+                    if (!res.ok) setFormError(res.error || 'Não foi possível enviar o pedido.');
+                  }}
+                  className="w-full flex items-center justify-center gap-1.5 py-2 px-3 rounded-xl bg-[#3044f0] hover:bg-[#2334c9] text-white text-xs font-bold transition-colors"
+                >
+                  <UserPlus className="w-3.5 h-3.5" />
+                  <span>Adicionar amigo</span>
+                </button>
+              )}
+            </div>
+          );
+        })()}
         {punished && (
           <p className="text-xs text-rose-600 font-semibold mt-1 flex items-center gap-1.5">
             <Clock className="w-3.5 h-3.5" /> De castigo {untilLabel(member.punishedUntil || 0)}

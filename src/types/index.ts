@@ -149,6 +149,24 @@ export interface Room {
   };
 }
 
+export interface FriendRequest {
+  id: string;
+  user: User;
+  createdAt: string;
+}
+
+export interface DirectMessage {
+  id: string;
+  senderId: string;
+  senderName: string;
+  senderAvatar: string;
+  senderAvatarUrl?: string;
+  senderColor: string;
+  content: string;
+  gifUrl?: string;
+  createdAt: string;
+}
+
 export interface ChatAttachment {
   id: string;
   name: string;
