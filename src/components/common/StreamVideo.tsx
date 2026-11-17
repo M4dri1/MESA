@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useEffect, useRef } from 'react';
+import { useMesa } from '@/context/MesaContext';
 
 interface StreamVideoProps {
   stream: MediaStream | null | undefined;
@@ -37,8 +38,21 @@ export function StreamVideo({ stream, className = '', mirrored = false }: Stream
  * o elemento <audio> não amplifica, e no iPhone ele nem deixa mudar o volume.
  */
 export function StreamAudio({ stream, muted, volume = 1 }: { stream: MediaStream; muted: boolean; volume?: number }) {
+  const { audioOutputId } = useMesa();
   const ref = useRef<HTMLAudioElement>(null);
   const boostRef = useRef<{ ctx: AudioContext; gain: GainNode; stream: MediaStream } | null>(null);
+
+  useEffect(() => {
+    const el = ref.current as (HTMLAudioElement & { setSinkId?: (id: string) => Promise<void> }) | null;
+    if (!el) return;
+    if (typeof el.setSinkId === 'function') {
+      el.setSinkId(audioOutputId || '').catch(() => {});
+    }
+    const ctx = boostRef.current?.ctx as (AudioContext & { setSinkId?: (id: string) => Promise<void> }) | undefined;
+    if (ctx && typeof ctx.setSinkId === 'function') {
+      ctx.setSinkId(audioOutputId || '').catch(() => {});
+    }
+  }, [audioOutputId]);
 
   useEffect(() => {
     const el = ref.current;

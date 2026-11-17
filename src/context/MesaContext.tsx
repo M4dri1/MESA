@@ -48,7 +48,7 @@ export interface AuthResult {
 
 export type ModerationAction = 'kick' | 'punish' | 'pardon' | 'unban' | 'promote' | 'demote';
 export type ModerationDuration = number | 'forever';
-export type SettingsSection = 'account' | 'appearance' | 'notifications' | 'accessibility' | 'language';
+export type SettingsSection = 'account' | 'appearance' | 'voice' | 'notifications' | 'accessibility' | 'language';
 
 /** Castigo/expulsão ainda vale? (-1 = para sempre) */
 export const isActiveUntil = (until?: number | null) =>
@@ -228,9 +228,13 @@ interface MesaContextType {
   // Lousa compartilhada
   board: BoardApi;
 
-  // Supressão de ruído do seu microfone
+  // Supressão de ruído e dispositivos de áudio
   noiseSuppression: boolean;
   toggleNoiseSuppression: () => Promise<void>;
+  audioInputId: string;
+  setAudioInputId: (deviceId: string) => Promise<void>;
+  audioOutputId: string;
+  setAudioOutputId: (deviceId: string) => void;
 
   // Tela compartilhada: só assiste (e ouve) quem quiser
   watchedScreenId: string | null;
@@ -473,6 +477,13 @@ export function MesaProvider({ children }: { children: ReactNode }) {
   const [mediaNotice, setMediaNotice] = useState<string | null>(null);
   const [myPunishedUntil, setMyPunishedUntil] = useState(0);
   const [noiseSuppression, setNoiseSuppression] = useState(true);
+  const [audioInputId, setAudioInputIdState] = useState<string>(() => {
+    try { return localStorage.getItem('mesa_audio_input') || ''; } catch { return ''; }
+  });
+  const [audioOutputId, setAudioOutputIdState] = useState<string>(() => {
+    try { return localStorage.getItem('mesa_audio_output') || ''; } catch { return ''; }
+  });
+  const audioInputIdRef = useRef<string>(audioInputId);
   const [music, setMusic] = useState<MusicState>(EMPTY_MUSIC);
   const [unread, setUnread] = useState({ count: 0, mentions: 0 });
   const chatVisibleRef = useRef(false);
@@ -970,9 +981,23 @@ export function MesaProvider({ children }: { children: ReactNode }) {
     if (micStartingRef.current || localRef.current.mic) return;
     micStartingRef.current = true;
     try {
-      const raw = await navigator.mediaDevices.getUserMedia({
-        audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
-      });
+      const baseAudio: MediaTrackConstraints = { echoCancellation: true, noiseSuppression: true, autoGainControl: true };
+      const chosenId = audioInputIdRef.current;
+      let raw: MediaStream;
+      try {
+        raw = await navigator.mediaDevices.getUserMedia({
+          audio: chosenId ? { ...baseAudio, deviceId: { exact: chosenId } } : baseAudio,
+        });
+      } catch (err: any) {
+        if (chosenId && (err?.name === 'OverconstrainedError' || err?.name === 'NotFoundError')) {
+          audioInputIdRef.current = '';
+          setAudioInputIdState('');
+          try { localStorage.removeItem('mesa_audio_input'); } catch {}
+          raw = await navigator.mediaDevices.getUserMedia({ audio: baseAudio });
+        } else {
+          throw err;
+        }
+      }
       const track = await processMicTrack(raw);
       if (!roomIdRef.current || localRef.current.mic || punishedRef.current) {
         stopStream(raw);
@@ -1021,6 +1046,40 @@ export function MesaProvider({ children }: { children: ReactNode }) {
     if (next) playUnmuteSound();
     else playMuteSound();
     showNotice(next ? 'Supressão de ruído ligada: teclado, ventilador e barulho de fundo são filtrados.' : 'Supressão de ruído desligada: seu microfone vai sem filtro extra.');
+  };
+
+  /** Troca o microfone de entrada; se já estiver na chamada, reinicia a faixa com o novo dispositivo */
+  const setAudioInputId = async (deviceId: string) => {
+    audioInputIdRef.current = deviceId;
+    setAudioInputIdState(deviceId);
+    try {
+      if (deviceId) localStorage.setItem('mesa_audio_input', deviceId);
+      else localStorage.removeItem('mesa_audio_input');
+    } catch {}
+    if (roomIdRef.current && localRef.current.mic) {
+      const wasMicOn = mediaRef.current.isMicOn;
+      stopStream(rawMicRef.current);
+      rawMicRef.current = null;
+      stopStream(localRef.current.mic);
+      localRef.current.mic = null;
+      teardownNoise();
+      await startMic(true);
+      const restartedMic = localRef.current.mic as MediaStream | null;
+      if (!wasMicOn && restartedMic) {
+        restartedMic.getAudioTracks().forEach((t) => (t.enabled = false));
+        (rawMicRef.current as MediaStream | null)?.getAudioTracks().forEach((t) => (t.enabled = false));
+        setMedia({ isMicOn: false });
+      }
+    }
+  };
+
+  /** Troca a saída de áudio (alto-falante/fone) */
+  const setAudioOutputId = (deviceId: string) => {
+    setAudioOutputIdState(deviceId);
+    try {
+      if (deviceId) localStorage.setItem('mesa_audio_output', deviceId);
+      else localStorage.removeItem('mesa_audio_output');
+    } catch {}
   };
 
   const toggleMic = async () => {
@@ -2722,6 +2781,10 @@ export function MesaProvider({ children }: { children: ReactNode }) {
         board,
         noiseSuppression,
         toggleNoiseSuppression,
+        audioInputId,
+        setAudioInputId,
+        audioOutputId,
+        setAudioOutputId,
         watchedScreenId,
         watchScreen,
         screenViewers,

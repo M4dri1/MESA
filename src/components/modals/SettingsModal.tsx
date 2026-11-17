@@ -1,19 +1,21 @@
 'use client';
 
 import React, { useEffect, useRef, useState } from 'react';
-import { Accessibility, Bell, Languages, Palette, User, X } from 'lucide-react';
+import { Accessibility, Bell, Languages, Mic, Palette, User, X } from 'lucide-react';
 import { SettingsSection, useMesa } from '@/context/MesaContext';
 import { PresenceSettings } from '@/components/common/PresenceSettings';
 import { AppearancePanel } from '@/components/modals/AppearancePanel';
 import { AccountPanel } from '@/components/settings/AccountPanel';
 import { AccessibilityPanel } from '@/components/settings/AccessibilityPanel';
 import { LanguagePanel } from '@/components/settings/LanguagePanel';
+import { VoiceAudioPanel } from '@/components/settings/VoiceAudioPanel';
 
 type Tab = { id: SettingsSection; label: string; icon: React.ComponentType<{ className?: string }>; needsAccount: boolean };
 
 const TABS: Tab[] = [
   { id: 'account', label: 'Minha conta', icon: User, needsAccount: true },
   { id: 'appearance', label: 'Aparência', icon: Palette, needsAccount: true },
+  { id: 'voice', label: 'Voz e Áudio', icon: Mic, needsAccount: false },
   { id: 'notifications', label: 'Notificações', icon: Bell, needsAccount: true },
   { id: 'accessibility', label: 'Acessibilidade', icon: Accessibility, needsAccount: false },
   { id: 'language', label: 'Idioma', icon: Languages, needsAccount: false },
@@ -139,6 +141,7 @@ export function SettingsModal() {
             />
           )}
           {active.id === 'appearance' && <AppearancePanel />}
+          {active.id === 'voice' && <VoiceAudioPanel />}
           {active.id === 'notifications' && (
             <div>
               <h2 className="landing-display text-2xl text-slate-950 flex items-center gap-2 mb-4">

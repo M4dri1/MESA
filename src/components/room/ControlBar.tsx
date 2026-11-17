@@ -3,7 +3,7 @@
 import React from 'react';
 import { useMesa } from '@/context/MesaContext';
 import { SoundpadButton } from './Soundpad';
-import { Mic, MicOff, Video, VideoOff, MonitorUp, PhoneOff, MessageSquare, Volume2, VolumeX, AudioLines } from 'lucide-react';
+import { Mic, MicOff, Video, VideoOff, MonitorUp, PhoneOff, MessageSquare, Volume2, VolumeX, AudioLines, SlidersHorizontal } from 'lucide-react';
 
 interface ControlBarProps {
   onToggleChat?: () => void;
@@ -29,6 +29,7 @@ export function ControlBar({ onToggleChat, showChatToggle = false }: ControlBarP
     setCurrentRoomId,
     noiseSuppression,
     toggleNoiseSuppression,
+    openSettings,
     unread,
     screenViewers,
   } = useMesa();
@@ -64,6 +65,16 @@ export function ControlBar({ onToggleChat, showChatToggle = false }: ControlBarP
         >
           <AudioLines className="w-5 h-5" />
           <span className="sr-only">Ruído</span>
+        </button>
+
+        {/* Escolher microfone e saída de áudio */}
+        <button
+          onClick={() => openSettings('voice')}
+          title="Configurar microfone e saída de áudio"
+          className={`${ROUND} ${NEUTRAL}`}
+        >
+          <SlidersHorizontal className="w-4 h-4" />
+          <span className="sr-only">Voz e Áudio</span>
         </button>
 
         {/* Soundpad */}
