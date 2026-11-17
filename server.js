@@ -2301,7 +2301,7 @@ function handleSocketMessage(ws, msg) {
       if (db.friendRequests.some((r) => r.fromId === user.id && r.toId === target.id)) {
         return fail('Você já enviou um pedido de amizade para essa pessoa.');
       }
-      db.friendRequests.push({ id: makeId('fr'), fromId: user.id, toId: target.id, createdAt: new Date().toISOString() });
+      db.friendRequests.push({ id: newId('fr'), fromId: user.id, toId: target.id, createdAt: new Date().toISOString() });
       save();
       pushState(user.id);
       pushState(target.id);
@@ -2368,7 +2368,7 @@ function handleSocketMessage(ws, msg) {
       const key = dmKey(user.id, friendId);
       db.dms[key] = db.dms[key] || [];
       const item = {
-        id: makeId('dm'),
+        id: newId('dm'),
         senderId: user.id,
         content,
         ...(gifUrl ? { gifUrl } : {}),
