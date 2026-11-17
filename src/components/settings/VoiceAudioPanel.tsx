@@ -21,6 +21,8 @@ export function VoiceAudioPanel() {
     setAudioOutputId,
     noiseSuppression,
     toggleNoiseSuppression,
+    isMicOn,
+    toggleMic,
   } = useMesa();
 
   const [inputs, setInputs] = useState<DeviceOption[]>([]);
@@ -33,6 +35,7 @@ export function VoiceAudioPanel() {
 
   const testCleanupRef = useRef<(() => void) | null>(null);
   const loopbackAudioRef = useRef<HTMLAudioElement | null>(null);
+  const mutedForTestRef = useRef(false);
 
   const canSelectOutput =
     typeof window !== 'undefined' &&
@@ -152,6 +155,11 @@ export function VoiceAudioPanel() {
       audioEl.play().catch(() => {});
       loopbackAudioRef.current = audioEl;
 
+      if (isMicOn) {
+        mutedForTestRef.current = true;
+        void toggleMic();
+      }
+
       testCleanupRef.current = () => {
         cancelAnimationFrame(raf);
         audioEl.pause();
@@ -159,6 +167,10 @@ export function VoiceAudioPanel() {
         loopbackAudioRef.current = null;
         stream.getTracks().forEach((t) => t.stop());
         ctx?.close().catch(() => {});
+        if (mutedForTestRef.current) {
+          mutedForTestRef.current = false;
+          void toggleMic();
+        }
       };
       setTesting(true);
     } catch {
