@@ -155,6 +155,12 @@ export interface FriendRequest {
   createdAt: string;
 }
 
+export interface MessageReply {
+  id: string;
+  senderName: string;
+  preview: string;
+}
+
 export interface DirectMessage {
   id: string;
   senderId: string;
@@ -164,6 +170,10 @@ export interface DirectMessage {
   senderColor: string;
   content: string;
   gifUrl?: string;
+  stickerUrl?: string;
+  attachment?: ChatAttachment;
+  replyTo?: MessageReply;
+  editedAt?: number;
   createdAt: string;
 }
 
@@ -198,6 +208,8 @@ export interface ChatMessage {
   /** @todos (só adm e dono) */
   mentionAll?: boolean;
   attachment?: ChatAttachment;
+  replyTo?: MessageReply;
+  editedAt?: number;
   isMe?: boolean;
 }
 

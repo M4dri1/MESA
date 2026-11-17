@@ -4,10 +4,10 @@ import React, { useEffect, useRef, useState } from 'react';
 import { useMesa } from '@/context/MesaContext';
 import { ColorField } from '@/components/common/ColorField';
 import { BoardStroke } from '@/types';
-import { Pencil, Eraser, Minus, Square, Circle, Undo2, Trash2, Download, Hand, ZoomIn, ZoomOut } from 'lucide-react';
+import { Pencil, Eraser, Minus, Square, Circle, Undo2, Trash2, Download, Hand, ZoomIn, ZoomOut, BoxSelect, Copy, ClipboardPaste, Check, X } from 'lucide-react';
 
-/** Ferramentas de desenho + "mover", que só arrasta a visão (não é enviada para ninguém) */
-type Tool = BoardStroke['tool'] | 'hand';
+/** Ferramentas de desenho + "mover" + "selecionar" (copiar e colar trecho igual no Paint) */
+type Tool = BoardStroke['tool'] | 'hand' | 'select';
 
 const ASPECT = 16 / 10;
 const MIN_ZOOM = 1;
@@ -29,6 +29,7 @@ const TOOLS: { id: Tool; label: string; icon: React.ComponentType<{ className?: 
   { id: 'line', label: 'Linha', icon: Minus },
   { id: 'rect', label: 'Retângulo', icon: Square },
   { id: 'ellipse', label: 'Elipse', icon: Circle },
+  { id: 'select', label: 'Selecionar e copiar trecho (igual Paint)', icon: BoxSelect },
   { id: 'hand', label: 'Mover a lousa (com zoom)', icon: Hand },
 ];
 
@@ -83,6 +84,17 @@ export function Whiteboard() {
   const [size, setSize] = useState(6);
   const [boardSize, setBoardSize] = useState({ width: 0, height: 0 });
   const [zoom, setZoom] = useState(1);
+  const [selectionBox, setSelectionBox] = useState<{ x0: number; y0: number; x1: number; y1: number } | null>(null);
+  const [hasClipboard, setHasClipboard] = useState(false);
+  const [pasteOffset, setPasteOffset] = useState<{ dx: number; dy: number } | null>(null);
+
+  const selectionRef = useRef<{ x0: number; y0: number; x1: number; y1: number; dragging: boolean } | null>(null);
+  const clipboardRef = useRef<{
+    strokes: Array<{ tool: BoardStroke['tool']; color: string; size: number; points: number[] }>;
+    box: { x: number; y: number; w: number; h: number };
+  } | null>(null);
+  const pasteDragRef = useRef<{ startPt: [number, number]; startDx: number; startDy: number } | null>(null);
+  const pasteOffsetRef = useRef<{ dx: number; dy: number } | null>(null);
 
   const wrapRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -115,6 +127,48 @@ export function Whiteboard() {
       ctx.fillRect(0, 0, canvas.width, canvas.height);
       ctx.setTransform(view.scale, 0, 0, view.scale, -view.x * canvas.width * view.scale, -view.y * canvas.height * view.scale);
       for (const stroke of board.getStrokes()) drawStroke(ctx, stroke, canvas.width, canvas.height);
+
+      // Pré-visualização de cola (arrastável antes de confirmar)
+      const pOff = pasteOffsetRef.current;
+      const clip = clipboardRef.current;
+      if (pOff && clip) {
+        for (const s of clip.strokes) {
+          const shifted: number[] = [];
+          for (let i = 0; i < s.points.length; i += 2) {
+            shifted.push(s.points[i] + pOff.dx, s.points[i + 1] + pOff.dy);
+          }
+          drawStroke(ctx, { id: 'preview', userId: '', ...s, points: shifted }, canvas.width, canvas.height);
+        }
+        ctx.save();
+        ctx.setLineDash([6, 4]);
+        ctx.strokeStyle = '#10b981';
+        ctx.lineWidth = Math.max(1.5, 2 / view.scale);
+        ctx.strokeRect(
+          (clip.box.x + pOff.dx) * canvas.width,
+          (clip.box.y + pOff.dy) * canvas.height,
+          clip.box.w * canvas.width,
+          clip.box.h * canvas.height
+        );
+        ctx.restore();
+      }
+
+      // Caixa de seleção tracejada estilo Paint
+      const sel = selectionRef.current;
+      if (sel) {
+        const sx = Math.min(sel.x0, sel.x1) * canvas.width;
+        const sy = Math.min(sel.y0, sel.y1) * canvas.height;
+        const sw = Math.abs(sel.x1 - sel.x0) * canvas.width;
+        const sh = Math.abs(sel.y1 - sel.y0) * canvas.height;
+        ctx.save();
+        ctx.setLineDash([6, 4]);
+        ctx.strokeStyle = '#3044f0';
+        ctx.fillStyle = 'rgba(48, 68, 240, 0.08)';
+        ctx.lineWidth = Math.max(1.5, 2 / view.scale);
+        ctx.fillRect(sx, sy, sw, sh);
+        ctx.strokeRect(sx, sy, sw, sh);
+        ctx.restore();
+      }
+
       ctx.setTransform(1, 0, 0, 1, 0, 0);
     });
   };
@@ -267,9 +321,28 @@ export function Whiteboard() {
       panRef.current = { x: e.clientX, y: e.clientY };
       return;
     }
-    if (isPunished) return;
 
     const point = position(e);
+
+    // Arrastar trecho colado antes de confirmar
+    if (pasteOffsetRef.current && clipboardRef.current) {
+      pasteDragRef.current = {
+        startPt: point,
+        startDx: pasteOffsetRef.current.dx,
+        startDy: pasteOffsetRef.current.dy,
+      };
+      return;
+    }
+
+    if (tool === 'select') {
+      selectionRef.current = { x0: point[0], y0: point[1], x1: point[0], y1: point[1], dragging: true };
+      setSelectionBox(null);
+      redraw();
+      return;
+    }
+
+    if (isPunished) return;
+
     if (tool !== 'eraser') rememberColor(color);
     drawingRef.current = {
       info: {
@@ -311,9 +384,28 @@ export function Whiteboard() {
       return;
     }
 
+    const point = position(e);
+
+    if (pasteDragRef.current && pasteOffsetRef.current) {
+      const next = {
+        dx: pasteDragRef.current.startDx + (point[0] - pasteDragRef.current.startPt[0]),
+        dy: pasteDragRef.current.startDy + (point[1] - pasteDragRef.current.startPt[1]),
+      };
+      pasteOffsetRef.current = next;
+      setPasteOffset(next);
+      redraw();
+      return;
+    }
+
+    if (selectionRef.current?.dragging) {
+      selectionRef.current.x1 = point[0];
+      selectionRef.current.y1 = point[1];
+      redraw();
+      return;
+    }
+
     const drawing = drawingRef.current;
     if (!drawing) return;
-    const point = position(e);
     const minStep = 0.002 / viewRef.current.scale;
     if (Math.abs(point[0] - drawing.last[0]) + Math.abs(point[1] - drawing.last[1]) < minStep) return;
     drawing.last = point;
@@ -326,8 +418,107 @@ export function Whiteboard() {
     pointersRef.current.delete(e.pointerId);
     if (pointersRef.current.size < 2) gestureRef.current = null;
     panRef.current = null;
+    pasteDragRef.current = null;
+    if (selectionRef.current?.dragging) {
+      selectionRef.current.dragging = false;
+      const { x0, y0, x1, y1 } = selectionRef.current;
+      if (Math.abs(x1 - x0) > 0.01 && Math.abs(y1 - y0) > 0.01) {
+        setSelectionBox({ x0: Math.min(x0, x1), y0: Math.min(y0, y1), x1: Math.max(x0, x1), y1: Math.max(y0, y1) });
+      } else {
+        selectionRef.current = null;
+        setSelectionBox(null);
+      }
+      redraw();
+    }
     finishStroke();
   };
+
+  const copySelection = () => {
+    const sel = selectionBox;
+    if (!sel) return;
+    const picked: Array<{ tool: BoardStroke['tool']; color: string; size: number; points: number[] }> = [];
+    for (const s of board.getStrokes()) {
+      let inside = false;
+      for (let i = 0; i < s.points.length; i += 2) {
+        const px = s.points[i];
+        const py = s.points[i + 1];
+        if (px >= sel.x0 && px <= sel.x1 && py >= sel.y0 && py <= sel.y1) {
+          inside = true;
+          break;
+        }
+      }
+      if (inside) picked.push({ tool: s.tool, color: s.color, size: s.size, points: [...s.points] });
+    }
+    if (picked.length === 0) return;
+    clipboardRef.current = {
+      strokes: picked,
+      box: { x: sel.x0, y: sel.y0, w: sel.x1 - sel.x0, h: sel.y1 - sel.y0 },
+    };
+    setHasClipboard(true);
+  };
+
+  const startPaste = () => {
+    if (!clipboardRef.current || isPunished) return;
+    selectionRef.current = null;
+    setSelectionBox(null);
+    const off = { dx: 0.04, dy: 0.04 };
+    pasteOffsetRef.current = off;
+    setPasteOffset(off);
+    redraw();
+  };
+
+  const commitPaste = () => {
+    const clip = clipboardRef.current;
+    const off = pasteOffsetRef.current;
+    if (!clip || !off || isPunished) return;
+    for (const s of clip.strokes) {
+      const shifted: number[] = [];
+      for (let i = 0; i < s.points.length; i += 2) {
+        shifted.push(
+          Math.max(0, Math.min(1, s.points[i] + off.dx)),
+          Math.max(0, Math.min(1, s.points[i + 1] + off.dy))
+        );
+      }
+      const id = `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
+      board.draw({ id, tool: s.tool, color: s.color, size: s.size }, shifted, true);
+    }
+    pasteOffsetRef.current = null;
+    setPasteOffset(null);
+    redraw();
+  };
+
+  const cancelPaste = () => {
+    pasteOffsetRef.current = null;
+    setPasteOffset(null);
+    redraw();
+  };
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const tag = (e.target as HTMLElement | null)?.tagName;
+      if (tag === 'INPUT' || tag === 'TEXTAREA') return;
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'c' && selectionBox) {
+        e.preventDefault();
+        copySelection();
+      } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'v' && hasClipboard) {
+        e.preventDefault();
+        startPaste();
+      } else if (e.key === 'Enter' && pasteOffset) {
+        e.preventDefault();
+        commitPaste();
+      } else if (e.key === 'Escape') {
+        if (pasteOffset) cancelPaste();
+        else if (selectionBox) {
+          selectionRef.current = null;
+          setSelectionBox(null);
+          redraw();
+        }
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectionBox, hasClipboard, pasteOffset]);
 
   const handleClear = () => {
     if (canClearAll) {
@@ -503,6 +694,26 @@ export function Whiteboard() {
         </div>
 
         <div className="flex items-center gap-0.5 ml-auto">
+          {selectionBox && (
+            <button
+              type="button"
+              title="Copiar trecho selecionado (Ctrl+C)"
+              onClick={copySelection}
+              className="px-2 py-1.5 rounded-lg bg-[#3044f0] hover:bg-[#2334c9] text-white text-xs font-bold flex items-center gap-1 mr-1"
+            >
+              <Copy className="w-3.5 h-3.5" /> Copiar
+            </button>
+          )}
+          {hasClipboard && !pasteOffset && (
+            <button
+              type="button"
+              title="Colar trecho copiado (Ctrl+V)"
+              onClick={startPaste}
+              className="px-2 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold flex items-center gap-1 mr-1"
+            >
+              <ClipboardPaste className="w-3.5 h-3.5" /> Colar
+            </button>
+          )}
           <button type="button" title="Desfazer meu último traço" onClick={() => board.undo()} className={toolButton(false)}>
             <Undo2 className="w-4 h-4" />
           </button>
@@ -537,6 +748,26 @@ export function Whiteboard() {
           <span className="absolute top-4 right-4 px-2 py-1 rounded-md bg-black/60 text-[11px] font-semibold text-white pointer-events-none">
             Zoom {Math.round(zoom * 100)}% · use a mão para mover
           </span>
+        )}
+        {pasteOffset && (
+          <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex items-center gap-2 px-3 py-1.5 rounded-full bg-slate-900/90 text-white text-xs font-bold shadow-lg">
+            <span>Arraste para posicionar</span>
+            <button
+              type="button"
+              onClick={commitPaste}
+              className="px-2.5 py-1 rounded-full bg-emerald-600 hover:bg-emerald-700 flex items-center gap-1"
+            >
+              <Check className="w-3.5 h-3.5" /> Colar aqui
+            </button>
+            <button
+              type="button"
+              onClick={cancelPaste}
+              title="Cancelar"
+              className="p-1 rounded-full hover:bg-white/15"
+            >
+              <X className="w-3.5 h-3.5" />
+            </button>
+          </div>
         )}
         {isPunished && (
           <span className="absolute bottom-4 px-3 py-1 rounded-full bg-black/70 text-xs font-semibold text-white">

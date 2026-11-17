@@ -189,7 +189,8 @@ interface MesaContextType {
   historyStatus: 'idle' | 'loading' | 'done' | 'error';
   /** Busca no servidor todo o histórico da sala (para a busca do chat) */
   loadHistory: () => Promise<void>;
-  sendMessage: (content: string) => void;
+  sendMessage: (content: string, replyToId?: string) => void;
+  editMessage: (id: string, content: string) => Promise<{ ok: boolean; error?: string }>;
   materials: StudyMaterial[];
   addMaterial: (material: { title: string; url: string }) => Promise<boolean>;
   /** Imagens abrem direto no chat; com `asDocument` (ou outros tipos) viram cartão de documento */
@@ -337,9 +338,28 @@ interface MesaContextType {
   dmUnread: Record<string, number>;
   openDm: (friendId: string) => Promise<void>;
   closeDm: () => void;
-  sendDm: (friendId: string, content: string, gifUrl?: string) => Promise<{ ok: boolean; error?: string }>;
+  sendDm: (friendId: string, content: string, opts?: { gifUrl?: string; stickerId?: string; replyToId?: string }) => Promise<{ ok: boolean; error?: string }>;
+  editDm: (friendId: string, id: string, content: string) => Promise<{ ok: boolean; error?: string }>;
+  uploadDmFile: (friendId: string, file: File, asDocument?: boolean) => Promise<{ ok: boolean; error?: string }>;
   isFriendsDrawerOpen: boolean;
   setIsFriendsDrawerOpen: (open: boolean) => void;
+
+  // Ligação privada 1-a-1 entre amigos
+  dmCall: {
+    peer: User;
+    status: 'calling' | 'ringing' | 'active';
+    video: boolean;
+    micOn: boolean;
+    camOn: boolean;
+    localStream: MediaStream | null;
+    remoteStream: MediaStream | null;
+  } | null;
+  startDmCall: (friend: User, video?: boolean) => Promise<void>;
+  acceptDmCall: () => Promise<void>;
+  declineDmCall: () => void;
+  endDmCall: () => void;
+  toggleDmCallMic: () => void;
+  toggleDmCallCam: () => Promise<void>;
 
   // Avisos (permissão de mídia, erros, convites)
   mediaNotice: string | null;
@@ -565,6 +585,10 @@ export function MesaProvider({ children }: { children: ReactNode }) {
   const activeDmFriendIdRef = useRef<string | null>(null);
   const [dmMessages, setDmMessages] = useState<Record<string, DirectMessage[]>>({});
   const [dmUnread, setDmUnread] = useState<Record<string, number>>({});
+  const [dmCall, setDmCall] = useState<MesaContextType['dmCall']>(null);
+  const dmCallRef = useRef<MesaContextType['dmCall']>(null);
+  const dmPcRef = useRef<RTCPeerConnection | null>(null);
+  const dmIceQueueRef = useRef<RTCIceCandidateInit[]>([]);
   const [soundActive, setSoundActive] = useState(true);
 
   /* ---------------- Referências (valores usados dentro de callbacks) ---------------- */
@@ -1396,7 +1420,7 @@ export function MesaProvider({ children }: { children: ReactNode }) {
   };
 
   /* ---------------- Chat, materiais, anotações ---------------- */
-  const sendMessage = (content: string) => {
+  const sendMessage = (content: string, replyToId?: string) => {
     const roomId = roomIdRef.current;
     if (!roomId || !content.trim()) return;
     if (punishedRef.current) return punishedNotice();
@@ -1426,8 +1450,203 @@ export function MesaProvider({ children }: { children: ReactNode }) {
     }
     mentions.delete(userRef.current.id);
     const encrypted = encryptRoomText(roomId, roomKeysRef.current.get(roomId), trimmed);
-    if (wsSend({ type: 'chat:send', content: encrypted, mentions: Array.from(mentions), mentionAll })) playMessageSentSound();
+    if (wsSend({ type: 'chat:send', content: encrypted, mentions: Array.from(mentions), mentionAll, ...(replyToId ? { replyToId } : {}) })) playMessageSentSound();
     else showNotice('Sem conexão com o servidor. A mensagem não foi enviada.');
+  };
+
+  const editMessage = async (id: string, content: string) => {
+    const roomId = roomIdRef.current;
+    const trimmed = content.trim();
+    if (!roomId || !trimmed) return { ok: false, error: 'A mensagem não pode ficar vazia.' };
+    if (punishedRef.current) return { ok: false, error: 'Você está de castigo.' };
+    const encrypted = encryptRoomText(roomId, roomKeysRef.current.get(roomId), trimmed);
+    const res = await request('chat:edit', { id, content: encrypted });
+    if (!res.ok) return { ok: false, error: res.error || 'Não foi possível editar.' };
+    return { ok: true };
+  };
+
+  /* ---------------- Ligação privada 1-a-1 entre amigos ---------------- */
+  const cleanupDmCall = () => {
+    if (dmPcRef.current) {
+      dmPcRef.current.onicecandidate = null;
+      dmPcRef.current.ontrack = null;
+      dmPcRef.current.close();
+      dmPcRef.current = null;
+    }
+    dmIceQueueRef.current = [];
+    const cur = dmCallRef.current;
+    if (cur?.localStream) stopStream(cur.localStream);
+    dmCallRef.current = null;
+    setDmCall(null);
+  };
+
+  const beginDmCallWebRtc = async (isInitiator: boolean) => {
+    const cur = dmCallRef.current;
+    if (!cur) return;
+    let localStream: MediaStream | null = null;
+    try {
+      const audioConstraint: MediaTrackConstraints = {
+        echoCancellation: true,
+        noiseSuppression: true,
+        autoGainControl: true,
+        ...(audioInputIdRef.current ? { deviceId: { exact: audioInputIdRef.current } } : {}),
+      };
+      localStream = await navigator.mediaDevices.getUserMedia({ audio: audioConstraint, video: cur.video });
+    } catch {
+      try {
+        localStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+      } catch {
+        showNotice('Não foi possível abrir o microfone para a ligação privada.');
+      }
+    }
+
+    const pc = new RTCPeerConnection({ iceServers: ICE_SERVERS });
+    dmPcRef.current = pc;
+    const peerId = cur.peer.id;
+    const updated: NonNullable<MesaContextType['dmCall']> = {
+      ...cur,
+      status: 'active',
+      localStream,
+      micOn: !!localStream?.getAudioTracks().length,
+      camOn: !!localStream?.getVideoTracks().length,
+    };
+    dmCallRef.current = updated;
+    setDmCall(updated);
+
+    if (localStream) {
+      localStream.getTracks().forEach((track) => pc.addTrack(track, localStream!));
+    }
+    pc.onicecandidate = (e) => {
+      if (e.candidate) wsSend({ type: 'dmCall:signal', friendId: peerId, data: { candidate: e.candidate } });
+    };
+    pc.ontrack = (e) => {
+      const stream = e.streams[0] || new MediaStream([e.track]);
+      if (dmCallRef.current) {
+        const next = { ...dmCallRef.current, remoteStream: stream };
+        dmCallRef.current = next;
+        setDmCall(next);
+      }
+    };
+
+    if (isInitiator) {
+      const offer = await pc.createOffer();
+      await pc.setLocalDescription(offer);
+      wsSend({ type: 'dmCall:signal', friendId: peerId, data: { description: pc.localDescription } });
+    }
+  };
+
+  const handleDmCallSignal = async (data: any) => {
+    const cur = dmCallRef.current;
+    if (!cur || !data) return;
+    if (!dmPcRef.current && data.description?.type === 'offer') {
+      await beginDmCallWebRtc(false);
+    }
+    const pc = dmPcRef.current;
+    if (!pc) return;
+    try {
+      if (data.description) {
+        await pc.setRemoteDescription(new RTCSessionDescription(data.description));
+        for (const cand of dmIceQueueRef.current) await pc.addIceCandidate(new RTCIceCandidate(cand)).catch(() => {});
+        dmIceQueueRef.current = [];
+        if (data.description.type === 'offer') {
+          const ans = await pc.createAnswer();
+          await pc.setLocalDescription(ans);
+          wsSend({ type: 'dmCall:signal', friendId: cur.peer.id, data: { description: pc.localDescription } });
+        }
+      } else if (data.candidate) {
+        if (pc.remoteDescription) await pc.addIceCandidate(new RTCIceCandidate(data.candidate)).catch(() => {});
+        else dmIceQueueRef.current.push(data.candidate);
+      }
+    } catch {}
+  };
+
+  const startDmCall = async (friend: User, video = false) => {
+    if (dmCallRef.current) {
+      showNotice('Você já está em uma ligação privada.');
+      return;
+    }
+    const next: MesaContextType['dmCall'] = {
+      peer: friend,
+      status: 'calling',
+      video,
+      micOn: true,
+      camOn: video,
+      localStream: null,
+      remoteStream: null,
+    };
+    dmCallRef.current = next;
+    setDmCall(next);
+    const res = await request('dmCall:invite', { friendId: friend.id, video });
+    if (!res.ok) {
+      cleanupDmCall();
+      showNotice(res.error || 'Não foi possível ligar.');
+    }
+  };
+
+  const acceptDmCall = async () => {
+    const cur = dmCallRef.current;
+    if (!cur || cur.status !== 'ringing') return;
+    await beginDmCallWebRtc(false);
+    wsSend({ type: 'dmCall:accept', friendId: cur.peer.id });
+    playUnmuteSound();
+  };
+
+  const declineDmCall = () => {
+    const cur = dmCallRef.current;
+    if (!cur) return;
+    wsSend({ type: 'dmCall:decline', friendId: cur.peer.id });
+    cleanupDmCall();
+  };
+
+  const endDmCall = () => {
+    const cur = dmCallRef.current;
+    if (!cur) return;
+    wsSend({ type: 'dmCall:end', friendId: cur.peer.id });
+    cleanupDmCall();
+    playLeaveRoomSound();
+  };
+
+  const toggleDmCallMic = () => {
+    const cur = dmCallRef.current;
+    if (!cur || !cur.localStream) return;
+    const nextMic = !cur.micOn;
+    cur.localStream.getAudioTracks().forEach((t) => (t.enabled = nextMic));
+    const updated = { ...cur, micOn: nextMic };
+    dmCallRef.current = updated;
+    setDmCall(updated);
+    if (nextMic) playUnmuteSound();
+    else playMuteSound();
+  };
+
+  const toggleDmCallCam = async () => {
+    const cur = dmCallRef.current;
+    const pc = dmPcRef.current;
+    if (!cur || !pc) return;
+    const existing = cur.localStream?.getVideoTracks() || [];
+    if (existing.length > 0) {
+      const nextCam = !cur.camOn;
+      existing.forEach((t) => (t.enabled = nextCam));
+      const updated = { ...cur, camOn: nextCam };
+      dmCallRef.current = updated;
+      setDmCall(updated);
+      return;
+    }
+    try {
+      const camStream = await navigator.mediaDevices.getUserMedia({ video: true });
+      const track = camStream.getVideoTracks()[0];
+      if (!track) return;
+      const stream = cur.localStream || new MediaStream();
+      stream.addTrack(track);
+      pc.addTrack(track, stream);
+      const offer = await pc.createOffer();
+      await pc.setLocalDescription(offer);
+      wsSend({ type: 'dmCall:signal', friendId: cur.peer.id, data: { description: pc.localDescription } });
+      const updated = { ...cur, localStream: stream, camOn: true, video: true };
+      dmCallRef.current = updated;
+      setDmCall(updated);
+    } catch {
+      showNotice('Não foi possível abrir a câmera.');
+    }
   };
 
   const addMaterial = async (material: { title: string; url: string }) => {
@@ -2043,6 +2262,58 @@ export function MesaProvider({ children }: { children: ReactNode }) {
         }
         return;
       }
+      case 'dm:edited': {
+        const peerId = String(msg.peerId || '');
+        if (!peerId) return;
+        setDmMessages((prev) => ({
+          ...prev,
+          [peerId]: (prev[peerId] || []).map((m) => (m.id === msg.id ? { ...m, content: msg.content, editedAt: msg.editedAt } : m)),
+        }));
+        return;
+      }
+      case 'dmCall:incoming': {
+        const from = msg.from as User | undefined;
+        if (!from) return;
+        if (dmCallRef.current) {
+          wsSend({ type: 'dmCall:decline', friendId: from.id });
+          return;
+        }
+        const next: MesaContextType['dmCall'] = {
+          peer: from,
+          status: 'ringing',
+          video: !!msg.video,
+          micOn: true,
+          camOn: !!msg.video,
+          localStream: null,
+          remoteStream: null,
+        };
+        dmCallRef.current = next;
+        setDmCall(next);
+        playPeerJoinSound();
+        return;
+      }
+      case 'dmCall:accepted': {
+        if (!dmCallRef.current || dmCallRef.current.peer.id !== msg.fromId) return;
+        void beginDmCallWebRtc(true);
+        return;
+      }
+      case 'dmCall:declined': {
+        if (!dmCallRef.current || dmCallRef.current.peer.id !== msg.fromId) return;
+        cleanupDmCall();
+        showNotice('Ligação recusada.');
+        return;
+      }
+      case 'dmCall:ended': {
+        if (!dmCallRef.current || dmCallRef.current.peer.id !== msg.fromId) return;
+        cleanupDmCall();
+        playLeaveRoomSound();
+        return;
+      }
+      case 'dmCall:signal': {
+        if (!dmCallRef.current || dmCallRef.current.peer.id !== msg.fromId) return;
+        void handleDmCallSignal(msg.data);
+        return;
+      }
       case 'peer:joined': {
         if (msg.roomId !== roomIdRef.current || msg.user.id === userRef.current.id) return;
         let isNew = false;
@@ -2123,6 +2394,13 @@ export function MesaProvider({ children }: { children: ReactNode }) {
             setUnread((prev) => ({ count: prev.count + 1, mentions: prev.mentions + (mentioned ? 1 : 0) }));
           }
         }
+        return;
+      }
+      case 'chat:edited': {
+        const text = decryptRoomText(msg.roomId, roomKeysRef.current.get(msg.roomId), msg.content || '');
+        const patch = (list: ChatMessage[]) => list.map((m) => (m.id === msg.id ? { ...m, content: text, editedAt: msg.editedAt } : m));
+        setAllMessages((prev) => ({ ...prev, [msg.roomId]: patch(prev[msg.roomId] || []) }));
+        setOlderMessages((prev) => (prev[msg.roomId] ? { ...prev, [msg.roomId]: patch(prev[msg.roomId]) } : prev));
         return;
       }
       case 'chat:deleted': {
@@ -2693,6 +2971,7 @@ export function MesaProvider({ children }: { children: ReactNode }) {
         historyStatus: currentHistoryStatus,
         loadHistory,
         sendMessage,
+        editMessage,
         materials: currentRoomMaterials,
         addMaterial,
         uploadRealFile,
@@ -2755,14 +3034,55 @@ export function MesaProvider({ children }: { children: ReactNode }) {
           activeDmFriendIdRef.current = null;
           setActiveDmFriendId(null);
         },
-        sendDm: async (friendId: string, content: string, gifUrl?: string) => {
-          const res = await request('dm:send', { friendId, content, ...(gifUrl ? { gifUrl } : {}) });
+        sendDm: async (friendId: string, content: string, opts?: { gifUrl?: string; stickerId?: string; replyToId?: string }) => {
+          const res = await request('dm:send', {
+            friendId,
+            content,
+            ...(opts?.gifUrl ? { gifUrl: opts.gifUrl } : {}),
+            ...(opts?.stickerId ? { stickerId: opts.stickerId } : {}),
+            ...(opts?.replyToId ? { replyToId: opts.replyToId } : {}),
+          });
           if (!res.ok) return { ok: false, error: res.error || 'Não foi possível enviar.' };
           playMessageSentSound();
           return { ok: true };
         },
+        editDm: async (friendId: string, id: string, content: string) => {
+          const res = await request('dm:edit', { friendId, id, content });
+          if (!res.ok) return { ok: false, error: res.error || 'Não foi possível editar.' };
+          return { ok: true };
+        },
+        uploadDmFile: async (friendId: string, file: File, asDocument = false) => {
+          const token = tokenRef.current;
+          if (!token) return { ok: false, error: 'Sessão expirada.' };
+          try {
+            const res = await fetch('/api/upload', {
+              method: 'POST',
+              headers: {
+                Authorization: `Bearer ${token}`,
+                'x-dm-with': friendId,
+                'x-file-name': encodeURIComponent(file.name),
+                'x-as-document': asDocument ? '1' : '0',
+                'Content-Type': file.type || 'application/octet-stream',
+              },
+              body: file,
+            });
+            const data = await res.json().catch(() => ({}));
+            if (!res.ok) return { ok: false, error: data.error || 'Não foi possível enviar o arquivo.' };
+            playMessageSentSound();
+            return { ok: true };
+          } catch {
+            return { ok: false, error: 'Falha de conexão ao enviar o arquivo.' };
+          }
+        },
         isFriendsDrawerOpen,
         setIsFriendsDrawerOpen,
+        dmCall,
+        startDmCall,
+        acceptDmCall,
+        declineDmCall,
+        endDmCall,
+        toggleDmCallMic,
+        toggleDmCallCam,
 
         isCreateModalOpen,
         setIsCreateModalOpen,

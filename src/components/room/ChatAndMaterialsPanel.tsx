@@ -28,6 +28,9 @@ import {
   Play,
   Search,
   Lock,
+  Reply,
+  Pencil,
+  Check,
 } from 'lucide-react';
 import { MusicPanel, MusicStrip } from './MusicPanel';
 import { User } from '@/types';
@@ -101,6 +104,7 @@ export function ChatAndMaterialsPanel() {
     historyStatus,
     loadHistory,
     sendMessage,
+    editMessage,
     materials,
     addMaterial,
     uploadRealFile,
@@ -129,6 +133,8 @@ export function ChatAndMaterialsPanel() {
   const [newMaterialUrl, setNewMaterialUrl] = useState('');
   const [isDragging, setIsDragging] = useState(false);
   const [downloadNotice, setDownloadNotice] = useState<string | null>(null);
+  const [replyingTo, setReplyingTo] = useState<{ id: string; senderName: string; preview: string } | null>(null);
+  const [editingMsg, setEditingMsg] = useState<{ id: string; text: string } | null>(null);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const chatFileInputRef = useRef<HTMLInputElement>(null);
@@ -443,9 +449,10 @@ export function ChatAndMaterialsPanel() {
     const text = inputText.trim();
     if (!text && staged.length === 0) return;
     if (text) {
-      sendMessage(text);
+      sendMessage(text, replyingTo?.id);
       setInputText('');
       setMention(null);
+      setReplyingTo(null);
     }
     // O texto vai primeiro e aparece em cima da foto, como uma legenda
     if (staged.length > 0) void sendStaged();
@@ -912,8 +919,36 @@ export function ChatAndMaterialsPanel() {
                     mentionsMe ? 'bg-[#ffd027]/25 border-l-2 border-[#3044f0]' : 'hover:bg-white/[0.03]'
                   } ${flashId === msg.id ? 'ring-2 ring-[#ffd027] bg-[#ffd027]/35' : ''}`}
                 >
-                  {/* Copiar e apagar: aparecem ao passar o mouse (sempre visíveis no celular) */}
+                  {/* Responder, copiar, editar e apagar: aparecem ao passar o mouse (sempre visíveis no celular) */}
                   <div className="absolute right-1 top-0 z-10 flex gap-0.5 rounded-lg bg-white border border-slate-900/10 p-0.5 shadow opacity-100 md:opacity-0 md:group-hover:opacity-100 focus-within:opacity-100 transition-opacity">
+                    {msg.senderId !== 'system' && (
+                      <button
+                        type="button"
+                        data-testid="reply-message"
+                        title="Responder mensagem"
+                        onClick={() => {
+                          const preview = msg.content.trim()
+                            ? msg.content.trim().slice(0, 90)
+                            : msg.attachment?.name || 'Mídia';
+                          setReplyingTo({ id: msg.id, senderName: msg.senderName, preview });
+                          inputRef.current?.focus();
+                        }}
+                        className="p-1 rounded-md text-slate-700 hover:text-[#3044f0] hover:bg-slate-900/10"
+                      >
+                        <Reply className="w-3.5 h-3.5" />
+                      </button>
+                    )}
+                    {isMine && msg.senderId !== 'system' && msg.content.trim() && (
+                      <button
+                        type="button"
+                        data-testid="edit-message"
+                        title="Editar mensagem"
+                        onClick={() => setEditingMsg({ id: msg.id, text: msg.content })}
+                        className="p-1 rounded-md text-slate-700 hover:text-[#3044f0] hover:bg-slate-900/10"
+                      >
+                        <Pencil className="w-3.5 h-3.5" />
+                      </button>
+                    )}
                     {msg.content.trim() && (
                       <button
                         type="button"
@@ -952,21 +987,63 @@ export function ChatAndMaterialsPanel() {
                       </span>
                       <span className="flex-shrink-0 whitespace-nowrap text-[10px] text-slate-500 font-mono">
                         {filtering ? `${dayLabel(msg.ts)} · ${msg.timestamp}` : msg.timestamp}
+                        {msg.editedAt ? ' · editada' : ''}
                       </span>
                     </div>
 
-                    {!hideText && (
-                      <p
-                        className="text-[13px] text-slate-800 mt-0.5 leading-relaxed break-words select-text"
-                        // O que as pessoas escrevem não é traduzido; os avisos do sistema e de arquivo compartilhado são
-                        translate={
-                          msg.senderId === 'system' || /^Compartilhou o (arquivo|link) "/.test(msg.content)
-                            ? undefined
-                            : 'no'
-                        }
+                    {msg.replyTo && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const el = document.querySelector(`[data-msg-id="${msg.replyTo!.id}"]`);
+                          el?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                        }}
+                        className="mt-1 mb-0.5 w-full text-left px-2.5 py-1 rounded-lg bg-slate-900/5 border-l-2 border-[#3044f0] text-[11px] text-slate-600 hover:bg-slate-900/10 transition-colors"
                       >
-                        {renderContent(msg.content, msg.mentionAll)}
-                      </p>
+                        <span className="font-bold text-slate-800">@{msg.replyTo.senderName}: </span>
+                        <span className="truncate">{msg.replyTo.preview}</span>
+                      </button>
+                    )}
+
+                    {editingMsg?.id === msg.id ? (
+                      <form
+                        onSubmit={async (e) => {
+                          e.preventDefault();
+                          const res = await editMessage(msg.id, editingMsg.text);
+                          if (res.ok) setEditingMsg(null);
+                          else notify(res.error || 'Não foi possível editar.');
+                        }}
+                        className="mt-1 flex items-center gap-1.5"
+                      >
+                        <input
+                          type="text"
+                          autoFocus
+                          value={editingMsg.text}
+                          onChange={(e) => setEditingMsg({ id: msg.id, text: e.target.value })}
+                          onKeyDown={(e) => { if (e.key === 'Escape') setEditingMsg(null); }}
+                          className="flex-1 min-w-0 px-2.5 py-1 rounded-lg bg-white border border-[#3044f0] text-xs text-slate-900 focus:outline-none"
+                        />
+                        <button type="submit" title="Salvar" className="p-1.5 rounded-lg bg-[#3044f0] text-white">
+                          <Check className="w-3.5 h-3.5" />
+                        </button>
+                        <button type="button" onClick={() => setEditingMsg(null)} title="Cancelar" className="p-1.5 rounded-lg bg-slate-900/5 text-slate-600">
+                          <X className="w-3.5 h-3.5" />
+                        </button>
+                      </form>
+                    ) : (
+                      !hideText && (
+                        <p
+                          className="text-[13px] text-slate-800 mt-0.5 leading-relaxed break-words select-text"
+                          // O que as pessoas escrevem não é traduzido; os avisos do sistema e de arquivo compartilhado são
+                          translate={
+                            msg.senderId === 'system' || /^Compartilhou o (arquivo|link) "/.test(msg.content)
+                              ? undefined
+                              : 'no'
+                          }
+                        >
+                          {renderContent(msg.content, msg.mentionAll)}
+                        </p>
+                      )
                     )}
 
                     {inlineSrc && (
@@ -1325,6 +1402,21 @@ export function ChatAndMaterialsPanel() {
           )}
 
           <form onSubmit={handleSendMessage} className="relative p-3 bg-[#f6f5f0] border-t border-slate-900/10">
+            {replyingTo && (
+              <div className="mb-2 flex items-center justify-between gap-2 px-3 py-1.5 rounded-xl bg-white border border-slate-900/10 text-xs">
+                <div className="min-w-0 truncate text-slate-600">
+                  Respondendo a <strong className="text-slate-900">@{replyingTo.senderName}</strong>: {replyingTo.preview}
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setReplyingTo(null)}
+                  title="Cancelar resposta"
+                  className="p-0.5 rounded text-slate-400 hover:text-slate-700"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            )}
             {mentionOptions.length > 0 && (
               <div
                 data-testid="mention-list"

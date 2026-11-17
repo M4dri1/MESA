@@ -14,6 +14,7 @@ import { InviteModal } from '@/components/modals/InviteModal';
 import { JoinByCodeModal } from '@/components/modals/JoinByCodeModal';
 import { DocumentViewerModal } from '@/components/modals/DocumentViewerModal';
 import { DirectMessageModal } from '@/components/modals/DirectMessageModal';
+import { DmCallOverlay } from '@/components/modals/DmCallOverlay';
 import { ParticipantModal } from '@/components/modals/ParticipantModal';
 import { SettingsModal } from '@/components/modals/SettingsModal';
 import { initPrefs } from '@/lib/preferences';
@@ -140,6 +141,7 @@ export function MainApp() {
       <JoinByCodeModal />
       <DocumentViewerModal />
       <DirectMessageModal />
+      <DmCallOverlay />
       {isAuthenticated && isFriendsDrawerOpen && <SidebarRightFriends asDrawer />}
       <ParticipantModal />
       <SettingsModal />

@@ -765,8 +765,49 @@ function dmDto(m) {
     senderColor: sender ? sender.avatarColor : '#3044f0',
     content: m.content || '',
     gifUrl: m.gifUrl || undefined,
+    stickerUrl: m.stickerUrl || undefined,
+    attachment: m.attachment || undefined,
+    replyTo: m.replyTo || undefined,
+    editedAt: m.editedAt || undefined,
     createdAt: m.createdAt,
   };
+}
+function buildReplySnapshot(list, replyToId) {
+  if (!replyToId || !Array.isArray(list)) return undefined;
+  const target = list.find((m) => m.id === String(replyToId));
+  if (!target) return undefined;
+  const sender = target.senderId === 'system' ? { nickname: 'Mesa' } : findUser(target.senderId);
+  const raw = String(target.content || '').trim();
+  let preview = '';
+  if (raw.startsWith('e2ee:v1:')) preview = '🔒 Mensagem criptografada';
+  else if (raw) preview = raw.length > 90 ? `${raw.slice(0, 87)}...` : raw;
+  else if (target.gifUrl) preview = 'GIF';
+  else if (target.stickerUrl || target.attachment?.type === 'sticker') preview = 'Figurinha';
+  else if (target.attachment?.voice) preview = 'Mensagem de voz';
+  else if (target.attachment?.type === 'image') preview = 'Foto';
+  else if (target.attachment?.type === 'video') preview = 'Vídeo';
+  else if (target.attachment?.name) preview = target.attachment.name;
+  else preview = 'Mensagem';
+  return { id: target.id, senderName: sender ? sender.nickname : 'Usuário', preview };
+}
+function addDmMessage(senderId, friendId, fields) {
+  db.dms = db.dms || {};
+  const key = dmKey(senderId, friendId);
+  db.dms[key] = db.dms[key] || [];
+  const item = {
+    id: newId('dm'),
+    senderId,
+    content: '',
+    createdAt: new Date().toISOString(),
+    ...fields,
+  };
+  db.dms[key].push(item);
+  if (db.dms[key].length > 300) db.dms[key].splice(0, db.dms[key].length - 300);
+  save();
+  const dto = dmDto(item);
+  sendToUser(senderId, { type: 'dm:new', peerId: friendId, message: dto });
+  sendToUser(friendId, { type: 'dm:new', peerId: senderId, message: dto });
+  return dto;
 }
 function friendRequestsFor(userId) {
   const list = db.friendRequests || [];
@@ -953,7 +994,9 @@ const limitText = (bytes) => (bytes >= 1024 * 1024 * 1024 ? `${Math.round((bytes
 /** Quanto ainda dá para enviar agora: pela sala, pela pessoa (hoje) e pelo disco */
 function uploadBudget(room, user) {
   let roomUsed = 0;
-  for (const file of Object.values(db.files)) if (file.roomId === room.id) roomUsed += file.size || 0;
+  if (room) {
+    for (const file of Object.values(db.files)) if (file.roomId === room.id) roomUsed += file.size || 0;
+  }
   const record = uploadDays.get(user.id);
   const dayUsed = record && record.day === today() ? record.bytes : 0;
   let diskFree = Infinity;
@@ -1460,12 +1503,19 @@ async function handleApi(req, res, url) {
   if (route === 'POST /api/upload') {
     const user = userFromToken(bearer(req));
     if (!user) return json(res, 401, { error: 'Sessão expirada.' });
-    const room = findRoom(String(req.headers['x-room-id'] || ''));
-    if (!room || !room.memberIds.includes(user.id) || bannedUntil(room, user.id)) {
-      return json(res, 403, { error: 'Você não participa dessa sala.' });
-    }
-    if (punishedUntil(room, user.id)) {
-      return json(res, 403, { error: 'Você está de castigo nesta sala e não pode enviar arquivos agora.' });
+    const dmWith = String(req.headers['x-dm-with'] || '');
+    const room = dmWith ? null : findRoom(String(req.headers['x-room-id'] || ''));
+    if (dmWith) {
+      if (!findUser(dmWith) || !areFriends(user.id, dmWith)) {
+        return json(res, 403, { error: 'Adicione como amigo para enviar arquivos no privado.' });
+      }
+    } else {
+      if (!room || !room.memberIds.includes(user.id) || bannedUntil(room, user.id)) {
+        return json(res, 403, { error: 'Você não participa dessa sala.' });
+      }
+      if (punishedUntil(room, user.id)) {
+        return json(res, 403, { error: 'Você está de castigo nesta sala e não pode enviar arquivos agora.' });
+      }
     }
 
     let name = 'arquivo';
@@ -1514,12 +1564,36 @@ async function handleApi(req, res, url) {
       // .webm pode ser áudio ou vídeo: vale o tipo que o navegador declarou, se for um vídeo conhecido
       const declared = String(req.headers['content-type'] || '').split(';')[0].trim().toLowerCase();
       const mime = VIDEO_TYPES.has(declared) ? declared : EXT_TYPES[ext] || 'application/octet-stream';
-      db.files[fileId] = { id: fileId, name, mime, size, roomId: room.id, uploaderId: user.id, iv: fileIv.toString('hex') };
+      db.files[fileId] = {
+        id: fileId,
+        name,
+        mime,
+        size,
+        ...(room ? { roomId: room.id } : { dmPair: [user.id, dmWith] }),
+        uploaderId: user.id,
+        iv: fileIv.toString('hex'),
+      };
       const dayRecord = uploadDays.get(user.id);
       uploadDays.set(user.id, { day: today(), bytes: (dayRecord && dayRecord.day === today() ? dayRecord.bytes : 0) + size });
       const url = `/api/files/${fileId}/${encodeURIComponent(name)}`;
       const isImage = mime.startsWith('image/');
       const asDocument = req.headers['x-as-document'] === '1';
+
+      if (dmWith) {
+        const type = mime.startsWith('audio/') && !asDocument
+          ? 'audio'
+          : mime.startsWith('video/') && !asDocument
+          ? 'video'
+          : isImage && !asDocument
+          ? 'image'
+          : mime === 'application/pdf'
+          ? 'pdf'
+          : 'file';
+        const message = addDmMessage(user.id, dmWith, {
+          attachment: { id: fileId, name, type, size: formatSize(size), url, ...(asDocument ? { asDocument: true } : {}) },
+        });
+        return json(res, 201, { ok: true, message });
+      }
 
       // Música para o bot: entra na fila (não vira mensagem nem material)
       if (req.headers['x-kind'] === 'music') {
@@ -1592,6 +1666,10 @@ async function handleApi(req, res, url) {
     if (file.roomId) {
       const room = findRoom(file.roomId);
       if (!room || !canSee(room, viewer.id)) {
+        return json(res, 403, { error: 'Você não tem acesso a este arquivo.' });
+      }
+    } else if (Array.isArray(file.dmPair)) {
+      if (!file.dmPair.includes(viewer.id)) {
         return json(res, 403, { error: 'Você não tem acesso a este arquivo.' });
       }
     }
@@ -2363,24 +2441,76 @@ function handleSocketMessage(ws, msg) {
       if (!friend || !areFriends(user.id, friendId)) return fail('Adicione como amigo para conversar no privado.');
       const content = String(msg.content || '').trim().slice(0, 1500);
       const gifUrl = msg.gifUrl && isGifMedia(msg.gifUrl) ? String(msg.gifUrl) : '';
-      if (!content && !gifUrl) return fail('Escreva uma mensagem.');
-      db.dms = db.dms || {};
+      let stickerUrl = '';
+      if (msg.stickerId) {
+        const sFile = db.files[String(msg.stickerId)];
+        if (sFile && sFile.sticker) stickerUrl = `/api/files/${sFile.id}/${encodeURIComponent(sFile.name)}`;
+      }
+      if (!content && !gifUrl && !stickerUrl) return fail('Escreva uma mensagem.');
       const key = dmKey(user.id, friendId);
-      db.dms[key] = db.dms[key] || [];
-      const item = {
-        id: newId('dm'),
-        senderId: user.id,
+      const replyTo = buildReplySnapshot((db.dms && db.dms[key]) || [], msg.replyToId);
+      const dto = addDmMessage(user.id, friendId, {
         content,
         ...(gifUrl ? { gifUrl } : {}),
-        createdAt: new Date().toISOString(),
-      };
-      db.dms[key].push(item);
-      if (db.dms[key].length > 300) db.dms[key].splice(0, db.dms[key].length - 300);
-      save();
-      const dto = dmDto(item);
-      sendToUser(user.id, { type: 'dm:new', peerId: friendId, message: dto });
-      sendToUser(friendId, { type: 'dm:new', peerId: user.id, message: dto });
+        ...(stickerUrl ? { stickerUrl } : {}),
+        ...(replyTo ? { replyTo } : {}),
+      });
       reply({ ok: true, message: dto });
+      return;
+    }
+
+    case 'dm:edit': {
+      const friendId = String(msg.friendId || '');
+      if (!areFriends(user.id, friendId)) return fail('Você não pode editar nessa conversa.');
+      const content = String(msg.content || '').trim().slice(0, 1500);
+      if (!content) return fail('A mensagem não pode ficar vazia.');
+      const key = dmKey(user.id, friendId);
+      const list = (db.dms && db.dms[key]) || [];
+      const target = list.find((m) => m.id === msg.id);
+      if (!target) return fail('Essa mensagem não existe mais.');
+      if (target.senderId !== user.id) return fail('Só quem enviou pode editar a mensagem.');
+      target.content = content;
+      target.editedAt = Date.now();
+      save();
+      const payload = { id: target.id, content: target.content, editedAt: target.editedAt };
+      sendToUser(user.id, { type: 'dm:edited', peerId: friendId, ...payload });
+      sendToUser(friendId, { type: 'dm:edited', peerId: user.id, ...payload });
+      reply({ ok: true });
+      return;
+    }
+
+    case 'dmCall:invite': {
+      const friendId = String(msg.friendId || '');
+      if (!areFriends(user.id, friendId)) return fail('Adicione como amigo para fazer uma ligação privada.');
+      if (!sockets.has(friendId)) return fail('Seu amigo está offline no momento.');
+      sendToUser(friendId, { type: 'dmCall:incoming', from: publicUser(user), video: !!msg.video });
+      reply({ ok: true });
+      return;
+    }
+
+    case 'dmCall:accept': {
+      const friendId = String(msg.friendId || '');
+      if (!areFriends(user.id, friendId)) return;
+      sendToUser(friendId, { type: 'dmCall:accepted', fromId: user.id });
+      return;
+    }
+
+    case 'dmCall:decline': {
+      const friendId = String(msg.friendId || '');
+      sendToUser(friendId, { type: 'dmCall:declined', fromId: user.id });
+      return;
+    }
+
+    case 'dmCall:end': {
+      const friendId = String(msg.friendId || '');
+      sendToUser(friendId, { type: 'dmCall:ended', fromId: user.id });
+      return;
+    }
+
+    case 'dmCall:signal': {
+      const friendId = String(msg.friendId || '');
+      if (!areFriends(user.id, friendId)) return;
+      sendToUser(friendId, { type: 'dmCall:signal', fromId: user.id, data: msg.data });
       return;
     }
   }
@@ -2638,7 +2768,12 @@ function handleSocketMessage(ws, msg) {
         mentions = parsed.mentions;
         mentionAll = parsed.mentionAll;
       }
-      addMessage(roomId, user.id, content, undefined, mentions.length || mentionAll ? { mentions, mentionAll } : undefined);
+      const replyTo = buildReplySnapshot(db.messages[roomId] || [], msg.replyToId);
+      const extra = {};
+      if (mentions.length) extra.mentions = mentions;
+      if (mentionAll) extra.mentionAll = true;
+      if (replyTo) extra.replyTo = replyTo;
+      addMessage(roomId, user.id, content, undefined, Object.keys(extra).length ? extra : undefined);
 
       // Quem foi marcado mas não está nesta chamada (outra sala, tela inicial) recebe o aviso mesmo assim
       const targets = mentionAll ? callRoom.memberIds.filter((id) => id !== user.id) : mentions;
@@ -2647,6 +2782,21 @@ function handleSocketMessage(ws, msg) {
         if (callOf(roomId).has(userId)) continue;
         sendToUser(userId, { type: 'mention', roomId, roomName: callRoom.name, from: user.nickname, preview });
       }
+      return;
+    }
+
+    case 'chat:edit': {
+      const list = db.messages[roomId] || [];
+      const target = list.find((m) => m.id === msg.id);
+      if (!target) return fail('Essa mensagem não existe mais.');
+      if (target.senderId !== user.id) return fail('Só quem enviou pode editar a mensagem.');
+      const content = String(msg.content || '').trim().slice(0, 6000);
+      if (!content) return fail('A mensagem não pode ficar vazia.');
+      target.content = content;
+      target.editedAt = Date.now();
+      save();
+      broadcastCall(roomId, { type: 'chat:edited', roomId, id: target.id, content: target.content, editedAt: target.editedAt });
+      reply({ ok: true });
       return;
     }
 
