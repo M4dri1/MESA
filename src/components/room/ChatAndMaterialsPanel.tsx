@@ -991,19 +991,25 @@ export function ChatAndMaterialsPanel() {
                       </span>
                     </div>
 
-                    {msg.replyTo && (
-                      <button
-                        type="button"
-                        onClick={() => {
-                          const el = document.querySelector(`[data-msg-id="${msg.replyTo!.id}"]`);
-                          el?.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                        }}
-                        className="mt-1 mb-0.5 w-full text-left px-2.5 py-1 rounded-lg bg-slate-900/5 border-l-2 border-[#3044f0] text-[11px] text-slate-600 hover:bg-slate-900/10 transition-colors"
-                      >
-                        <span className="font-bold text-slate-800">@{msg.replyTo.senderName}: </span>
-                        <span className="truncate">{msg.replyTo.preview}</span>
-                      </button>
-                    )}
+                    {msg.replyTo && (() => {
+                      const orig = messages.find((m) => m.id === msg.replyTo!.id) || olderMessages.find((m) => m.id === msg.replyTo!.id);
+                      const replyPreview = orig
+                        ? (orig.content.trim() ? orig.content.trim().slice(0, 90) : orig.attachment?.name || 'Mídia')
+                        : msg.replyTo.preview;
+                      return (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const el = document.querySelector(`[data-msg-id="${msg.replyTo!.id}"]`);
+                            el?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                          }}
+                          className="mt-1 mb-0.5 w-full text-left px-2.5 py-1 rounded-lg bg-slate-900/5 border-l-2 border-[#3044f0] text-[11px] text-slate-600 hover:bg-slate-900/10 transition-colors"
+                        >
+                          <span className="font-bold text-slate-800">@{msg.replyTo.senderName}: </span>
+                          <span className="truncate">{replyPreview}</span>
+                        </button>
+                      );
+                    })()}
 
                     {editingMsg?.id === msg.id ? (
                       <form
